@@ -37,3 +37,4 @@ stat knee_bs 20.8555 10.3038
 stat pel_turn 8.0494 10.0696
 stat contact_fwd 0.5043 0.0843
 stat elbow_fwd 0.3036 0.1032
+stat weight_shift -0.1272 0.1563

@@ -40,9 +40,10 @@ import kotlin.math.max
 /**
  * 空拍練習（小孩畫面）: front camera, mirrored like a mirror. Flow:
  * SETUP (whole body visible, stand at the right angle) → DEMO (watch the shadow, 2 warm-up swings)
- * → READY (raise a hand or tap = start) → 3-2-1 → FOLLOW: each real swing beeps + big counter + colour/stars/short voice
- * → after 5: REPLAY best swing (green, slow motion + shadow) and worst swing (red, freeze + arrow + 口訣)
- * → READY → FOCUS 5 swings on that one point → REPLAY → READY → …
+ * → READY: walk into place, hold the backswing (引拍) like the frozen shadow = start (the coach can also tap: 3-2-1)
+ * → FOLLOW: each real swing beeps + big counter + colour/stars/short voice
+ * → after 5: REVIEW carousel of all 5 swings (slow motion + shadow, good ones green, others freeze with arrow + 口訣),
+ *   looping until 「下一輪」 is tapped → READY → FOCUS 5 swings on that one point → REVIEW → READY → …
  * Nothing is counted outside a round. Tap during a round = pause; stepping out of the picture pauses by itself;
  * walking around is ignored. Long-press anywhere = coach debug overlay (why a swing was not counted).
  * With 「存骨架」 on, every session is saved to Download/TTCoach/shadow_*.jsonl.gz for tuning.
@@ -53,7 +54,7 @@ class ShadowActivity : ComponentActivity() {
     /** one camera frame kept for the replay: small JPEG + 2D landmarks + projection + 3D pose */
     class ClipFrame(val t: Double, val jpeg: ByteArray, val lm: List<FloatArray>, val aff: Affine?, val pose: Pose)
     /** one replay segment: a swing, played slowly, frozen at `freezeT` */
-    class Seg(val r: SwingResult, val clip: List<ClipFrame>, val good: Boolean, val issue: IssueDef?, val freezeT: Double, val freezeFor: Double, val caption: String)
+    class Seg(val num: Int, val r: SwingResult, val clip: List<ClipFrame>, val good: Boolean, val issue: IssueDef?, val freezeT: Double, val freezeFor: Double, val caption: String)
 
     private val prefs by lazy { getSharedPreferences("tt", Context.MODE_PRIVATE) }
     val rightHanded get() = prefs.getString("hand", "R") == "R"
@@ -93,7 +94,10 @@ class ShadowActivity : ComponentActivity() {
     private var angleNagAt = -1.0
     @Volatile var phaseStart = 0.0
     private var lastMotion = 0.0
-    private var handUpSince = -1.0
+    private var readySince = -1.0
+    /** 0..1 while the player holds the backswing to start (drawn as a ring around the racket hand) */
+    @Volatile var readyFrac = 0f
+    private lateinit var bsPose: BackswingPose
     private var lostSince = -1.0
     private var lastHip: DoubleArray? = null; private var lastHipT = 0.0
     private var movingUntil = 0.0
@@ -117,6 +121,8 @@ class ShadowActivity : ComponentActivity() {
     /** PAUSED because the player left the picture (resumes by itself) rather than a tap */
     var autoPaused = false
     private var demoSwings = 0
+    /** the review being shown is of a focus round (✓/✗ instead of stars) */
+    var roundWasFocusShown = false
     private var roundWasFocus = false; private var roundOk = 0; private var roundAllGood = false
 
     // ---- replay state (main thread) ----
@@ -130,6 +136,7 @@ class ShadowActivity : ComponentActivity() {
     private var shownFrame: ClipFrame? = null
     private var freezeLeft = 0.0
     private var saidForSeg = -1
+    private var reviewPass = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -138,6 +145,7 @@ class ShadowActivity : ComponentActivity() {
         tpl = Template(assets.open(spec.asset).bufferedReader().readText())
         coach = ShadowCoach(tpl, rightHanded, spec)
         tracker = PhaseTracker(tpl, rightHanded)
+        bsPose = BackswingPose(tpl, rightHanded)
         ghostLocal = tpl.build()
         kidArm = (tpl.lengths["shP-elP"] ?: 0.28) + (tpl.lengths["elP-wrP"] ?: 0.21)
         val root = FrameLayout(this)
@@ -160,11 +168,11 @@ class ShadowActivity : ComponentActivity() {
         startCamera()
     }
 
-    fun say(s: String, interrupt: Boolean = true) {
+    fun say(s: String, interrupt: Boolean = true, queue: Boolean = false) {
         if (s.isBlank()) return
         val t = tts ?: return
-        if (!interrupt && t.isSpeaking) return
-        t.speak(s, TextToSpeech.QUEUE_FLUSH, null, "sh")
+        if (!interrupt && !queue && t.isSpeaking) return
+        t.speak(s, if (queue) TextToSpeech.QUEUE_ADD else TextToSpeech.QUEUE_FLUSH, null, "sh")
     }
     private fun beep() { try { tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 70) } catch (_: Exception) {} }
 
@@ -173,18 +181,18 @@ class ShadowActivity : ComponentActivity() {
     private val angleHint get() = if (spec.key == "bh") "面向手機站好" else "身體站斜一點，像站在球桌前"
 
     fun goPhase(p: Phase, line: String? = null, resume: Boolean = false) {
-        phase = p; phaseStart = clock; handUpSince = -1.0
+        phase = p; phaseStart = clock; readySince = -1.0; readyFrac = 0f
         log?.line(String.format(Locale.US, "{\"ev\":\"phase\",\"p\":\"%s\",\"t\":%.3f}", p.name, clock))
         when (p) {
             Phase.SETUP -> { bigText = "站到畫面中間"; subText = "頭到腳都要拍到" }
             Phase.DEMO -> { bigText = "看影子，輕輕揮兩下"; subText = ""; demoSwings = 0; say("看影子怎麼打${strokeName}，跟著輕輕揮兩下") }
             Phase.READY -> {
-                bigText = "舉手開始"
-                subText = if (nextPhase == Phase.FOCUS) "這一輪只想：${focusIssue?.cue ?: ""}" else "跟著影子，${strokeName}揮 5 下"
-                say(line ?: (if (nextPhase == Phase.FOCUS) "下一輪只想一件事，${focusIssue?.cue}。準備好就舉手" else "準備好就舉手"))
+                bigText = "引拍準備"
+                subText = if (nextPhase == Phase.FOCUS) "這一輪只想：${focusIssue?.cue ?: ""}" else "像影子一樣把拍子拉到後面，停一下就開始"
+                say(line ?: (if (nextPhase == Phase.FOCUS) "下一輪只想一件事，${focusIssue?.cue}。站好，引拍準備就開始" else "站好，引拍準備就開始"))
             }
             Phase.COUNTDOWN -> { bigText = ""; subText = ""; say("三，二，一，開始！") }
-            Phase.PAUSED -> { bigText = if (autoPaused) "回到畫面中間" else "暫停"; subText = if (autoPaused) "" else "舉手或點一下繼續"; if (!autoPaused) say("暫停") }
+            Phase.PAUSED -> { bigText = if (autoPaused) "回到畫面中間" else "暫停"; subText = if (autoPaused) "" else "引拍準備或點一下繼續"; if (!autoPaused) say("暫停") }
             Phase.FOLLOW -> { if (!resume) startRound(null); bigText = ""; subText = ""; line?.let { say(it) } }
             Phase.FOCUS -> { val d = focusIssue!!; if (!resume) startRound(d); bigText = d.cue; subText = ""; line?.let { say(it) } }
             Phase.REPLAY -> {}
@@ -193,6 +201,8 @@ class ShadowActivity : ComponentActivity() {
     }
 
     private fun startCountdown(resume: Boolean) { resumeAfterCountdown = resume; goPhase(Phase.COUNTDOWN) }
+    /** started by holding the backswing: go at once, the player is already in position */
+    private fun startNow(resume: Boolean) { beep(); say("開始！"); goPhase(nextPhase, resume = resume) }
     private val inRound get() = phase == Phase.FOLLOW || phase == Phase.FOCUS
 
     private fun startRound(focus: IssueDef?) {
@@ -237,7 +247,7 @@ class ShadowActivity : ComponentActivity() {
             frames++; if (t - fpsT0 >= 1.0) { fps = frames / (t - fpsT0); frames = 0; fpsT0 = t }
             val res = lmk.detectForVideo(BitmapImageBuilder(bmp).build(), ts)
             val n = res.landmarks().firstOrNull(); val w = res.worldLandmarks().firstOrNull()
-            if (n == null || w == null) { lastLm = null; visibleSince = -1.0; angleOkSince = -1.0; energy *= 0.85f; handUpSince = -1.0
+            if (n == null || w == null) { lastLm = null; visibleSince = -1.0; angleOkSince = -1.0; energy *= 0.85f; readySince = -1.0; readyFrac = 0f
                 if (lostSince < 0) lostSince = t
                 coach.hold = true; tick(t); view.postInvalidate(); return }
             val lm = n.map { floatArrayOf(it.x(), it.y(), it.visibility().orElse(0f)) }
@@ -268,10 +278,11 @@ class ShadowActivity : ComponentActivity() {
             visibleSince = if (body) (if (visibleSince < 0) t else visibleSince) else -1.0
             angleOkSince = if (body && turnDeg in wantAngle) (if (angleOkSince < 0) t else angleOkSince) else -1.0
             lostSince = if (body) -1.0 else (if (lostSince < 0) t else lostSince)
-            // a hand held above the head = start / continue
-            val headTop = lm[0][1] - 0.6f * ((lm[11][1] + lm[12][1]) / 2 - lm[0][1])
-            val up = listOf(15, 16).any { lm[it][2] > 0.5f && lm[it][1] < headTop }
-            handUpSince = if (up) (if (handUpSince < 0) t else handUpSince) else -1.0
+            // 引拍準備 (hold the backswing, whole body in the picture) = start / continue
+            val waiting = phase == Phase.READY || (phase == Phase.PAUSED && !autoPaused)
+            val inBackswing = waiting && body && bsPose.distance(pose, kidArm) < bsPose.near && coach.speed < 0.8
+            readySince = if (inBackswing) (if (readySince < 0) t else readySince) else -1.0
+            readyFrac = if (readySince > 0) ((t - readySince) / READY_HOLD).toFloat().coerceIn(0f, 1f) else 0f
             // walking around (hips moving across the picture) is not a swing
             val hip = doubleArrayOf(((lm[23][0] + lm[24][0]) / 2).toDouble(), ((lm[23][1] + lm[24][1]) / 2).toDouble())
             lastHip?.let { h -> val v = hypot(hip[0] - h[0], hip[1] - h[1]) / max(1e-3, t - lastHipT); if (v > 0.35) movingUntil = t + 0.8 }
@@ -296,8 +307,9 @@ class ShadowActivity : ComponentActivity() {
                 if (e is ShadowEvent.Scored) {
                     synchronized(ring) { pendingClips.add(e.r) }
                     val r = e.r
-                    log?.line(String.format(Locale.US, "{\"ev\":\"swing\",\"t\":%.3f,\"shape\":%.3f,\"stars\":%d,\"z\":{%s}}", r.tImpact, r.shape, r.stars,
-                        r.z.entries.joinToString(",") { String.format(Locale.US, "\"%s\":%.2f", it.key, it.value) }))
+                    log?.line(String.format(Locale.US, "{\"ev\":\"swing\",\"t\":%.3f,\"shape\":%.3f,\"stars\":%d,\"z\":{%s},\"v\":{%s}}", r.tImpact, r.shape, r.stars,
+                        r.z.entries.joinToString(",") { String.format(Locale.US, "\"%s\":%.2f", it.key, it.value) },
+                        r.values.entries.joinToString(",") { String.format(Locale.US, "\"%s\":%.3f", it.key, it.value) }))
                 }
                 main.post { onEvent(e) }
             }
@@ -308,7 +320,8 @@ class ShadowActivity : ComponentActivity() {
 
             // the shadow: follows the player's own swing; plays the stroke by itself when they stand still
             val idle = t - lastMotion > 3.0
-            val gi = if (!inRound || idle) loopIndex(t, if (phase == Phase.DEMO) 2.0 else 1.0)
+            val gi = if (phase == Phase.READY || phase == Phase.PAUSED) bsPose.index        // show the pose to hold
+                     else if (!inRound || idle) loopIndex(t, if (phase == Phase.DEMO) 2.0 else 1.0)
                      else tracker.update(pose, kidArm)
             ghostIdx = gi
             val g = ghostLocal
@@ -337,13 +350,13 @@ class ShadowActivity : ComponentActivity() {
                     }
                 } else main.post { if (phase == Phase.SETUP) { bigText = "站到畫面中間"; subText = "頭到腳都要拍到" } }
             }
-            Phase.DEMO -> if (t - phaseStart > 5.0 && (demoSwings >= 2 || t - phaseStart > 12.0)) main.post { if (phase == Phase.DEMO) { nextPhase = Phase.FOLLOW; goPhase(Phase.READY, "看懂了嗎？準備好就舉手") } }
-            Phase.READY -> if (handUpSince > 0 && t - handUpSince > 0.6 && t - phaseStart > 1.0) main.post { if (phase == Phase.READY) startCountdown(false) }
+            Phase.DEMO -> if (t - phaseStart > 5.0 && (demoSwings >= 2 || t - phaseStart > 12.0)) main.post { if (phase == Phase.DEMO) { nextPhase = Phase.FOLLOW; goPhase(Phase.READY, "看懂了嗎？像影子一樣引拍準備，就開始") } }
+            Phase.READY -> if (readySince > 0 && t - readySince > READY_HOLD && t - phaseStart > 1.0) main.post { if (phase == Phase.READY) startNow(false) }
             Phase.COUNTDOWN -> if (t - phaseStart > 3.0) main.post { if (phase == Phase.COUNTDOWN) goPhase(nextPhase, resume = resumeAfterCountdown) }
             Phase.PAUSED -> main.post {
                 if (phase != Phase.PAUSED) return@post
                 if (autoPaused && visibleSince > 0 && t - visibleSince > 1.0) { autoPaused = false; say("繼續"); goPhase(nextPhase, resume = true) }
-                else if (!autoPaused && handUpSince > 0 && t - handUpSince > 0.6 && t - phaseStart > 1.0) startCountdown(true)
+                else if (!autoPaused && readySince > 0 && t - readySince > READY_HOLD && t - phaseStart > 1.0) startNow(true)
             }
             Phase.FOLLOW, Phase.FOCUS -> if (lostSince > 0 && t - lostSince > 0.7) main.post { if (inRound) pause(auto = true) }
             else -> {}
@@ -390,23 +403,25 @@ class ShadowActivity : ComponentActivity() {
         if (phase != Phase.FOLLOW && phase != Phase.FOCUS) return
         val rs = roundResults.toList(); if (rs.isEmpty()) return
         val focus = coach.focus?.let { k -> spec.issues.first { it.key == k } }
-        roundWasFocus = focus != null
+        roundWasFocus = focus != null; roundWasFocusShown = roundWasFocus
         roundOk = rs.count { it.focusOk == true }
         val issue = focus ?: coach.chooseFocus(rs.size)
         val zOf = { r: SwingResult -> r.z[issue.key] ?: 0.0 }
         val byClip = synchronized(clips) { rs.filter { (clips[it]?.size ?: 0) > 8 }.associateWith { clips[it]!! } }
-        val best = (if (focus != null) byClip.keys.minByOrNull(zOf) else byClip.keys.minByOrNull { it.zmax })
-        val worst = byClip.keys.maxByOrNull(zOf)
         roundAllGood = if (focus != null) roundOk >= 4 else rs.all { it.stars == 3 } && rs.maxOf(zOf) < 1.5
         focusIssue = issue
-        val rhythm = steadyRhythm()
         val list = ArrayList<Seg>()
-        if (best != null) list.add(Seg(best, byClip[best]!!, true, null, 0.0, 1.4, if (rhythm) "這下很棒！節奏也很穩" else "這下很棒！"))
-        if (worst != null && worst !== best && zOf(worst) >= 1.0 && !(focus != null && roundOk >= 4 && zOf(worst) < 1.5)) {
-            val ft = when (issue.at) { "bs" -> tpl.time(worst.ib); "fin" -> tpl.time(worst.i1); else -> 0.0 }
-            list.add(Seg(worst, byClip[worst]!!, false, issue, ft, 3.0, issue.cue))
+        rs.forEachIndexed { k, r ->
+            val clip = byClip[r] ?: return@forEachIndexed
+            val good = if (focus != null) r.focusOk == true else r.stars == 3
+            val iss = focus ?: r.worst
+            val ft = if (good) 0.0 else when (iss.at) { "bs" -> tpl.time(r.ib); "fin" -> tpl.time(r.i1); else -> 0.0 }
+            list.add(Seg(k + 1, r, clip, good, if (good) null else iss, ft, if (good) 1.2 else 2.5, if (good) "很棒！" else iss.cue))
         }
-        if (list.isEmpty()) { nextRound(); return }
+        val nGood = rs.count { if (focus != null) it.focusOk == true else it.stars == 3 }
+        val summary = (if (steadyRhythm()) "節奏很穩！" else "") + "這一輪 $nGood 下很棒。看看每一下，看完點下一輪"
+        if (list.isEmpty()) { say(summary); nextRound(); return }
+        say(summary)
         startReplay(list)
     }
 
@@ -416,7 +431,6 @@ class ShadowActivity : ComponentActivity() {
             if (phase != Phase.REPLAY) return
             val dt = 1 / 30.0
             val s = segs[segIdx]
-            if (saidForSeg != segIdx) { saidForSeg = segIdx; if (s.good) say(s.caption) }   // the worst swing speaks at its freeze
             if (frozen) {
                 freezeLeft -= dt
                 if (freezeLeft <= 0) frozen = false
@@ -425,11 +439,12 @@ class ShadowActivity : ComponentActivity() {
                 segT += dt * 0.5                                    // half speed
                 if (before < s.freezeT && segT >= s.freezeT && freezeLeft > 0) {
                     segT = s.freezeT; frozen = true
-                    if (!s.good) say(s.caption)
+                    if (reviewPass == 0 && saidForSeg != segIdx) { saidForSeg = segIdx; say("第${s.num}下，${s.caption}", queue = true) }
                 }
                 val end = s.clip.last().t - s.r.tImpact
                 if (segT > end) {
-                    if (segIdx + 1 < segs.size) { segIdx++; startSeg() } else { finishReplay(); return }
+                    if (segIdx + 1 < segs.size) segIdx++ else { segIdx = 0; reviewPass++ }      // keeps looping until 下一輪
+                    startSeg()
                 }
             }
             showAt(segs[segIdx], segT)
@@ -439,7 +454,7 @@ class ShadowActivity : ComponentActivity() {
     }
 
     private fun startReplay(list: List<Seg>) {
-        segs = list; segIdx = 0; saidForSeg = -1
+        segs = list; segIdx = 0; saidForSeg = -1; reviewPass = 0
         phase = Phase.REPLAY; phaseStart = clock; round++
         startSeg()
         main.removeCallbacks(replayTick); main.post(replayTick)
@@ -468,9 +483,14 @@ class ShadowActivity : ComponentActivity() {
         nextRound()
     }
 
+    /** review: jump to one swing (thumbnail) */
+    fun showSwing(i: Int) { if (phase == Phase.REPLAY && i in segs.indices) { segIdx = i; startSeg(); view.invalidate() } }
+    /** review: 「下一輪」 */
+    fun nextFromReview() { if (phase == Phase.REPLAY) finishReplay() }
+
     fun onTap() {
         when (phase) {
-            Phase.REPLAY -> finishReplay()
+            Phase.REPLAY -> {}
             Phase.SETUP, Phase.DEMO -> { nextPhase = Phase.FOLLOW; goPhase(Phase.READY) }
             Phase.READY -> startCountdown(false)
             Phase.FOLLOW, Phase.FOCUS -> pause(auto = false)
@@ -485,10 +505,12 @@ class ShadowActivity : ComponentActivity() {
     private fun nextRound() {
         nextPhase = if (roundAllGood) Phase.FOLLOW else Phase.FOCUS
         goPhase(Phase.READY, when {
-            roundAllGood && roundWasFocus -> "做到了！下一輪自由揮。準備好就舉手"
-            roundAllGood -> "五下都很棒！準備好就舉手"
+            roundAllGood && roundWasFocus -> "做到了！下一輪自由揮。站好，引拍準備就開始"
+            roundAllGood -> "五下都很棒！站好，引拍準備就開始"
             else -> null })
     }
+
+    companion object { const val READY_HOLD = 0.7 }
 
     override fun onDestroy() {
         main.removeCallbacks(replayTick)

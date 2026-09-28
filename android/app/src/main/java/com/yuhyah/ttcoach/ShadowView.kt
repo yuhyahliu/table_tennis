@@ -103,7 +103,7 @@ class ShadowView(ctx: Context, private val a: ShadowActivity) : View(ctx) {
         if (now < a.flashUntil) { p.style = Paint.Style.STROKE; p.color = a.flashColor; p.strokeWidth = u * 0.06f; c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), p) }
         if (now < a.starsUntil) text(c, "★".repeat(a.starsShown) + "☆".repeat(3 - a.starsShown), width / 2f, height * 0.52f, u * 0.2f, GOLD)
 
-        if (swinging || a.phase == ShadowActivity.Phase.DEMO) energyBar(c, u)
+        if (a.debug && (swinging || a.phase == ShadowActivity.Phase.DEMO)) energyBar(c, u)   // coach only: speed is not the goal
         if (swinging) {
             counter(c, u, now)
             if (a.phase == ShadowActivity.Phase.FOCUS) text(c, a.bigText, width / 2f, height - u * 0.07f, u * 0.085f, YELLOW)
@@ -113,13 +113,13 @@ class ShadowView(ctx: Context, private val a: ShadowActivity) : View(ctx) {
                 if (k >= 1) text(c, "$k", width / 2f, height * 0.62f, u * 0.5f, GOLD)
             }
             ShadowActivity.Phase.READY -> {
-                text(c, "✋", width / 2f, height * 0.55f, u * 0.28f)
+                readyRing(c, u)
                 text(c, a.bigText, width / 2f, height * 0.16f, u * 0.11f, GOLD)
                 text(c, a.subText, width / 2f, height * 0.16f + u * 0.11f, u * 0.065f)
             }
             ShadowActivity.Phase.PAUSED -> {
                 p.style = Paint.Style.FILL; p.color = Color.argb(110, 0, 0, 0); c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), p)
-                if (!a.autoPaused) text(c, "Ⅱ", width / 2f, height * 0.6f, u * 0.25f)
+                if (!a.autoPaused) { text(c, "Ⅱ", width / 2f, height * 0.6f, u * 0.25f); readyRing(c, u) }
                 text(c, a.bigText, width / 2f, height * 0.16f, u * 0.11f, Ui.WARN)
                 text(c, a.subText, width / 2f, height * 0.16f + u * 0.11f, u * 0.065f)
             }
@@ -131,6 +131,16 @@ class ShadowView(ctx: Context, private val a: ShadowActivity) : View(ctx) {
         }
         if (a.phase == ShadowActivity.Phase.SETUP && a.lastLm == null) text(c, "看不到你，退後一點", width / 2f, height * 0.55f, u * 0.08f, Ui.WARN)
         if (a.debug) drawDebug(c, u)
+    }
+
+    /** a ring around the racket hand that fills while the player holds the backswing */
+    private fun readyRing(c: Canvas, u: Float) {
+        val lm = a.lastLm ?: return
+        val w = lm[if (a.rightHanded) 16 else 15]
+        val x = vx(w[0].toDouble()); val y = vy(w[1].toDouble()); val r = u * 0.07f
+        p.style = Paint.Style.STROKE; p.strokeWidth = u * 0.018f
+        p.color = Color.argb(140, 255, 255, 255); c.drawCircle(x, y, r, p)
+        if (a.readyFrac > 0f) { p.color = Ui.ACC; c.drawArc(RectF(x - r, y - r, x + r, y + r), -90f, 360f * a.readyFrac, false, p) }
     }
 
     /** big "3/5" plus five circles: white the moment a swing is seen, then coloured by how good it was */
@@ -180,7 +190,8 @@ class ShadowView(ctx: Context, private val a: ShadowActivity) : View(ctx) {
         kid(c, f.lm, Color.argb(220, 120, 240, 120), u * 0.007f)
         val col = if (s.good) Ui.ACC else Ui.OPP
         p.style = Paint.Style.STROKE; p.color = col; p.strokeWidth = u * 0.035f; c.drawRect(box, p)
-        text(c, if (s.good) "最棒的一下" else "再加油的一下", width / 2f, box.top + u * 0.11f, u * 0.075f, col)
+        text(c, "第 ${s.num} 下  " + (if (a.roundWasFocusShown) (if (s.good) "★★★" else "★☆☆") else "★".repeat(s.r.stars) + "☆".repeat(3 - s.r.stars)),
+            width / 2f, box.top + u * 0.11f, u * 0.075f, col)
         if (!a.frozen) text(c, "慢動作", width - u * 0.16f, box.top + u * 0.11f, u * 0.045f, Color.argb(220, 255, 255, 255))
         if (a.frozen) {
             if (!s.good && s.issue != null && aff != null && g != null) {
@@ -194,10 +205,25 @@ class ShadowView(ctx: Context, private val a: ShadowActivity) : View(ctx) {
                 val pel = aff.map(f.pose[J.PELVIS])
                 arrow(c, x0, y0, x1, y1, u * 0.032f, YELLOW, if (s.issue.turn) floatArrayOf(vx(pel[0]), vy(pel[1])) else null)
             }
-            text(c, s.caption, width / 2f, box.bottom - u * 0.08f, u * 0.095f, if (s.good) Ui.ACC else YELLOW)
+            text(c, s.caption, width / 2f, box.bottom - u * 0.2f, u * 0.095f, if (s.good) Ui.ACC else YELLOW)
         }
-        text(c, "點一下跳過", u * 0.13f, box.bottom - u * 0.03f, u * 0.035f, Color.argb(150, 255, 255, 255))
+        // thumbnails of the 5 swings (tap = show that one) and the 「下一輪」 button
+        thumbs.clear()
+        val tw = u * 0.13f; val th = u * 0.1f; val gap = u * 0.025f; val ty = height - th - u * 0.03f
+        a.segs.forEachIndexed { i, sg ->
+            val r = RectF(u * 0.04f + i * (tw + gap), ty, u * 0.04f + i * (tw + gap) + tw, ty + th); thumbs.add(r)
+            p.style = Paint.Style.FILL; p.color = if (sg.good) Ui.ACC else Ui.OPP; p.alpha = if (i == a.segIdx) 255 else 130
+            c.drawRoundRect(r, u * 0.02f, u * 0.02f, p); p.alpha = 255
+            if (i == a.segIdx) { p.style = Paint.Style.STROKE; p.strokeWidth = u * 0.008f; p.color = Color.WHITE; c.drawRoundRect(r, u * 0.02f, u * 0.02f, p) }
+            text(c, "${sg.num}", r.centerX(), r.centerY() + u * 0.025f, u * 0.065f)
+        }
+        nextBtn.set(width - u * 0.42f, ty - u * 0.01f, width - u * 0.04f, ty + th)
+        p.style = Paint.Style.FILL; p.color = GOLD; c.drawRoundRect(nextBtn, u * 0.03f, u * 0.03f, p)
+        txt.textSize = u * 0.06f; txt.style = Paint.Style.FILL; txt.color = Color.BLACK
+        c.drawText("下一輪 ▶", nextBtn.centerX(), nextBtn.centerY() + u * 0.022f, txt)
     }
+    private val thumbs = ArrayList<RectF>()
+    private val nextBtn = RectF()
 
     /** coach only (long-press): why a swing was or was not counted */
     private fun drawDebug(c: Canvas, u: Float) {
@@ -222,7 +248,11 @@ class ShadowView(ctx: Context, private val a: ShadowActivity) : View(ctx) {
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> downAt = System.currentTimeMillis()
             MotionEvent.ACTION_UP -> {
-                if (System.currentTimeMillis() - downAt > 700) { a.debug = !a.debug; invalidate() } else a.onTap()
+                if (System.currentTimeMillis() - downAt > 700) { a.debug = !a.debug; invalidate() }
+                else if (a.phase == ShadowActivity.Phase.REPLAY) {
+                    if (nextBtn.contains(e.x, e.y)) a.nextFromReview()
+                    else thumbs.indexOfFirst { it.contains(e.x, e.y) }.takeIf { it >= 0 }?.let { a.showSwing(it) }
+                } else a.onTap()
             }
         }
         return true

@@ -81,6 +81,34 @@ class ShadowTest {
         assertTrue(wrongArm.results.size <= 3 && backwards.results.size <= 1 && asBackhand.results.size <= 1)
     }
 
+    /** 引拍 starts a round: the standard backswing end is "near", the ready stance, contact and finish are not */
+    @Test fun backswingStartPose() {
+        for (spec in listOf(StrokeSpec.FOREHAND, StrokeSpec.BACKHAND)) {
+            val tpl = tpl(spec); val g = tpl.build()
+            val arm = (tpl.lengths["shP-elP"] ?: 0.28) + (tpl.lengths["elP-wrP"] ?: 0.21)
+            val bp = BackswingPose(tpl, true)
+            val d = (0 until tpl.n step 6).map { i -> "%.2f:%.2f".format(tpl.time(i), bp.distance(g[i], arm)) }
+            println("${spec.key} backswing distance over the stroke: " + d.joinToString(" "))
+            assertTrue(bp.distance(g[bp.index], arm) < 0.05)
+            assertTrue("contact is not a start", bp.distance(g[tpl.impact], arm) > bp.near)
+            assertTrue("finish is not a start", bp.distance(g[tpl.index(tpl.finishT)], arm) > bp.near)
+            // athletes: how much of a real session sits in the start pose (only brief moments while swinging)
+        }
+        // a relaxed stance (arms hanging) is not a start
+        val tpl = tpl(StrokeSpec.FOREHAND)
+        val (rows, _) = session("fig_p01_30fps.csv.gz")
+        val p0 = poseFromMpWorld(rows[0].second, true)
+        val hang = Array(14) { p0[it].copyOf() }
+        for ((sh, el, wr) in listOf(Triple(J.SH_P, J.EL_P, J.WR_P), Triple(J.SH_N, J.EL_N, J.WR_N))) {
+            hang[el] = doubleArrayOf(hang[sh][0], hang[sh][1], hang[sh][2] - 0.28); hang[wr] = doubleArrayOf(hang[sh][0], hang[sh][1], hang[sh][2] - 0.52) }
+        for (spec in listOf(StrokeSpec.FOREHAND, StrokeSpec.BACKHAND)) {
+            val bp = BackswingPose(tpl(spec), true)
+            val dh = bp.distance(hang, 0.5)
+            println("${spec.key} arms hanging: %.2f (near < %.2f)".format(dh, bp.near))
+            assertTrue(dh > bp.near)
+        }
+    }
+
     @Test fun phaseTrackerFollowsTheTemplate() {
         val tpl = tpl(StrokeSpec.FOREHAND)
         val g = tpl.build()

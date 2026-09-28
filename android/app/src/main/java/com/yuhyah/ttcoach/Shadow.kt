@@ -9,6 +9,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -129,6 +130,36 @@ class StrokeSpec(val key: String, val name: String, val asset: String, val later
     }
 }
 
+/** where the pelvis is between the feet, sideways: -1 over the other foot … +1 over the playing-side foot */
+fun weight(p: Pose): Double {
+    val w = abs(p[J.AN_P][0] - p[J.AN_N][0]) / 2 + 1e-9
+    return (p[J.PELVIS][0] - (p[J.AN_P][0] + p[J.AN_N][0]) / 2) / w
+}
+
+/**
+ * One front camera measures depth poorly, so the turn of the shoulders / hips from MediaPipe depth is noisy.
+ * Their sideways + vertical extent in the picture is reliable, and a line of known width looks narrower the more it is turned:
+ * depth = ±sqrt(width² − sideways² − vertical²), keeping only the sign from MediaPipe. Applied to world (z-up) poses.
+ */
+fun rectifyTurn(world: Array<Pose>, recent: List<Pose>): Array<Pose> {
+    fun width(a: Int, b: Int): Double {
+        val seen = recent.map { hypot(it[a][0] - it[b][0], it[a][2] - it[b][2]) }
+        val full = recent.map { (it[a] - it[b]).len() }
+        return max(pct(seen, 0.95), 0.85 * pct(full, 0.5))
+    }
+    val out = Array(world.size) { i -> Array(14) { world[i][it].copyOf() } }
+    for ((a, b) in listOf(J.SH_N to J.SH_P, J.HIP_N to J.HIP_P)) {
+        val w = width(a, b)
+        for (p in out) {
+            val dx = p[b][0] - p[a][0]; val dz = p[b][2] - p[a][2]; val dy = p[b][1] - p[a][1]
+            val depth = sqrt(max(0.0, w * w - dx * dx - dz * dz)) * (if (dy < 0) -1.0 else 1.0)
+            val my = (p[a][1] + p[b][1]) / 2
+            p[a][1] = my - depth / 2; p[b][1] = my + depth / 2
+        }
+    }
+    return out
+}
+
 /** local-frame curves → all key values; ib/i1 = backswing end / finish indices on the template grid */
 fun swingValues(local: Array<Pose>, t0: Double, dt: Double, stroke: String = "fh"): Triple<Map<String, Double>, Int, Int> {
     val n = local.size; val i0 = ((0 - t0) / dt).toInt().coerceIn(1, n - 2)
@@ -147,7 +178,8 @@ fun swingValues(local: Array<Pose>, t0: Double, dt: Double, stroke: String = "fh
         "elbow_imp" to angle(local[i0][J.SH_P], local[i0][J.EL_P], local[i0][J.WR_P]),
         "upperarm_imp" to angle(local[i0][J.EL_P], local[i0][J.SH_P], local[i0][J.HIP_P]),
         "knee_bs" to knee(ib), "pel_turn" to pelRot(i1) - pelRot(ib),
-        "contact_fwd" to fwd[i0], "elbow_fwd" to local[i0][J.EL_P][1] - local[i0][J.PELVIS][1])
+        "contact_fwd" to fwd[i0], "elbow_fwd" to local[i0][J.EL_P][1] - local[i0][J.PELVIS][1],
+        "weight_shift" to weight(local[ib]) - weight(local[i1]))
     return Triple(m, ib, i1)
 }
 
@@ -184,6 +216,8 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
     private val peaks = ArrayDeque<Double>()
     var focus: String? = null
     var hold = false
+    /** measure body turn from the picture (sideways width) instead of MediaPipe depth */
+    var rectify = true
     private var lastCand = -9.0
     private val pendSpeed = HashMap<Double, Double>()
     /** the standard wrist path (sideways, up) relative to the pelvis, in arm lengths, on the template grid */
@@ -263,7 +297,14 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
         val a = world[tpl.index(-0.25)][J.WR_P]; val b = world[tpl.index(0.1)][J.WR_P]
         if ((b - a).dot(fr.y) < 0) fr = fr.flipped()
         val local = Array(tpl.n) { i -> Array(14) { j -> fr.toLocal(world[i][j]) } }
-        val (vals, ib, i1) = swingValues(local, tpl.t0, tpl.dt, spec.key)
+        val (v0, ib, i1) = swingValues(local, tpl.t0, tpl.dt, spec.key)
+        val vals = if (!rectify) v0 else {
+            // body turn from the picture-based shoulder / hip lines; everything else from the original pose
+            val rw = rectifyTurn(world, buf.map { it.p })
+            val rl = Array(tpl.n) { i -> Array(14) { j -> fr.toLocal(rw[i][j]) } }
+            val (v1, _, _) = swingValues(rl, tpl.t0, tpl.dt, spec.key)
+            v0 + mapOf("sh_turn" to v1["sh_turn"]!!, "pel_turn" to v1["pel_turn"]!!)
+        }
         val z = HashMap<String, Double>()
         for (d in spec.issues) { val (med, iqr) = tpl.stats[d.key] ?: continue; z[d.key] = d.bad * ((vals[d.key] ?: med) - med) / (iqr / 1.35 + 1e-9) }
         val worst = spec.issues.maxByOrNull { z[it.key] ?: -9.0 }!!
@@ -350,6 +391,29 @@ class PhaseTracker(tpl: Template, private val rightHanded: Boolean) {
         if (index > n * 3 / 4 && d(0) < bd * 0.6) best = 0
         index = best
         return index
+    }
+}
+
+/**
+ * 引拍準備 = the start signal: the player holds the racket back like the standard stroke's backswing end.
+ * Compares the racket wrist relative to the pelvis (sideways + height, in arm lengths) with the template's backswing-end position.
+ */
+class BackswingPose(tpl: Template, private val rightHanded: Boolean) {
+    val index = tpl.index(tpl.backswingT)
+    private val target: DoubleArray
+    /** how close counts as "in the backswing": tighter for compact strokes (backhand) whose contact is near the backswing */
+    val near: Double
+    init {
+        val all = tpl.build(); val g = all[index]
+        val arm = (tpl.lengths["shP-elP"] ?: 0.28) + (tpl.lengths["elP-wrP"] ?: 0.21)
+        target = doubleArrayOf((g[J.WR_P][0] - g[J.PELVIS][0]) / arm, (g[J.WR_P][2] - g[J.PELVIS][2]) / arm)
+        near = min(0.3, 0.6 * distance(all[tpl.impact], arm))
+    }
+    fun distance(kid: Pose, kidArm: Double): Double {
+        val fr = BodyFrame.of(kid, rightHanded)
+        val w = fr.toLocal(kid[J.WR_P]); val pv = fr.toLocal(kid[J.PELVIS])
+        val dx = (w[0] - pv[0]) / kidArm - target[0]; val dz = (w[2] - pv[2]) / kidArm - target[1]
+        return sqrt(dx * dx + dz * dz)
     }
 }
 
