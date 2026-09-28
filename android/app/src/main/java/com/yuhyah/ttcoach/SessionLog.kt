@@ -28,12 +28,14 @@ class SessionLog(ctx: Context, val name: String) {
         }
         val uri = ctx.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
         val os = uri?.let { ctx.contentResolver.openOutputStream(it) }
-        out = os?.let { BufferedWriter(OutputStreamWriter(GZIPOutputStream(it, 1 shl 16), Charsets.UTF_8), 1 shl 16) }
+        out = os?.let { BufferedWriter(OutputStreamWriter(GZIPOutputStream(it, 1 shl 16, true), Charsets.UTF_8), 1 shl 16) }
     }
 
     val ok get() = out != null
 
-    fun line(s: String) { val o = out ?: return; io.execute { try { o.write(s); o.write("\n") } catch (_: Exception) { } } }
+    private var lines = 0
+    /** flushed every ~200 lines (sync flush): the file stays readable even if the app is closed without finishing it */
+    fun line(s: String) { val o = out ?: return; io.execute { try { o.write(s); o.write("\n"); if (++lines % 200 == 0) o.flush() } catch (_: Exception) { } } }
 
     private fun f(v: Float) = String.format(Locale.US, "%.4f", v)
 

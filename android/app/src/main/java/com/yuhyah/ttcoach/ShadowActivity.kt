@@ -117,6 +117,7 @@ class ShadowActivity : ComponentActivity() {
     var focusIssue: IssueDef? = null
     /** the round that starts after READY / the one a pause interrupted */
     var nextPhase = Phase.FOLLOW
+    private var focusTargetNext = 1.0
     private var resumeAfterCountdown = false
     /** PAUSED because the player left the picture (resumes by itself) rather than a tap */
     var autoPaused = false
@@ -208,6 +209,7 @@ class ShadowActivity : ComponentActivity() {
 
     private fun startRound(focus: IssueDef?) {
         roundResults.clear(); roundDetected = 0; detectTimes.clear(); coach.resetCount(); coach.focus = focus?.key
+        coach.focusTarget = if (focus != null) focusTargetNext else 1.0
         synchronized(clips) { clips.clear() }
     }
 
@@ -412,6 +414,9 @@ class ShadowActivity : ComponentActivity() {
         val byClip = synchronized(clips) { rs.filter { (clips[it]?.size ?: 0) > 8 }.associateWith { clips[it]!! } }
         roundAllGood = if (focus != null) roundOk >= 4 else rs.all { it.stars == 3 } && rs.maxOf(zOf) < 1.5
         focusIssue = issue
+        // the next focus round asks for a step from where the player is now, not the athletes' level at once
+        val base = pct(rs.map { it.z[issue.key] ?: 0.0 }, 0.5)
+        focusTargetNext = max(1.0, 0.6 * base)
         val list = ArrayList<Seg>()
         rs.forEachIndexed { k, r ->
             val clip = byClip[r] ?: return@forEachIndexed

@@ -217,6 +217,8 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
     private var sp1 = 0.0; private var sp2 = 0.0
     private val peaks = ArrayDeque<Double>()
     var focus: String? = null
+    /** a focus swing counts as done when its z is below this: 1 = like the athletes; higher = a step from the player's own level */
+    var focusTarget = 1.0
     var hold = false
     /** measure body turn from the picture (sideways width) instead of MediaPipe depth */
     var rectify = true
@@ -348,7 +350,7 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
         val zmax = z.values.maxOrNull() ?: 0.0
         // lenient on purpose: ~90% of the athletes' own strokes score 3 stars at 30 fps
         val stars = if (zmax < 2.5) 3 else if (zmax < 4.0) 2 else 1
-        val fok = focus?.let { (z[it] ?: 0.0) < 1.0 }
+        val fok = focus?.let { (z[it] ?: 0.0) < focusTarget }
         return SwingResult(tImpact, stars, vals, z, worst, local, fr, ib, i1, fok, shapeScore(local), sc)
     }
 
