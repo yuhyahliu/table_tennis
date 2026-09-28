@@ -16,7 +16,12 @@ android {
         targetSdk = 35
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
         versionName = "0.3.$versionCode"
+        // Pixel 9a and every recent Android phone are arm64: ship only that ABI (the others tripled the download)
+        ndk { abiFilters += "arm64-v8a" }
     }
+
+    // compress the native libraries inside the APK (smaller download; extracted at install time)
+    packaging { jniLibs { useLegacyPackaging = true } }
 
     signingConfigs {
         if (ttKeystore != null && file(ttKeystore).exists()) {
