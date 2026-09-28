@@ -39,7 +39,8 @@ class ShadowView(ctx: Context, private val a: ShadowActivity) : View(ctx) {
     /** the orange shadow: slim limbs, see-through, so the child's own body stays visible */
     private fun shadow(c: Canvas, pose: Pose, aff: Affine, alpha: Int) {
         val pts = pose.map { aff.map(it) }
-        fun X(i: Int) = vx(pts[i][0]); fun Y(i: Int) = vy(pts[i][1])
+        fun X(i: Int) = vx(pts[i][0])
+        fun Y(i: Int) = vy(pts[i][1])
         val sw = hypot(X(J.SH_P) - X(J.SH_N), Y(J.SH_P) - Y(J.SH_N)).coerceAtLeast(20f)
         p.style = Paint.Style.STROKE; p.color = ORANGE; p.alpha = alpha; p.strokeWidth = sw * 0.28f
         for ((i, j) in BONES) c.drawLine(X(i), Y(i), X(j), Y(j), p)
