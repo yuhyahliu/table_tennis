@@ -23,10 +23,11 @@ jobs:
           meta = {k: art.get(k) for k in ['title','doi','license','authors','description','published_date','citation']}
           json.dump(meta, open('out/META.json','w'), ensure_ascii=False, indent=1)
           lines = []
-          for f in art['files']:
+          for i, f in enumerate(art['files']):
               name = f['name']; url = f['download_url']
+              if name.startswith('step1_'): lines.append(f"{i:03d} {name} skipped (raw, step2 is the filtered copy)"); continue
               b = requests.get(url, timeout=300).content
-              safe = name.replace('/', '__')
+              safe = f"{i:03d}_{f['id']}_" + name.replace('/', '__')
               lines.append(f"{name}\t{len(b)}")
               if name.lower().endswith('.xlsx'):
                   xl = pd.read_excel(io.BytesIO(b), sheet_name=None)

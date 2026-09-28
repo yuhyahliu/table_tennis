@@ -68,8 +68,24 @@ jobs:
       - name: Compact copy
         if: github.event.inputs.stage == 'convert'
         run: |
-          cd raw && tar czf ../out/ttmd6_text.tgz $(find . -type f \( -name '*.csv' -o -name '*.txt' -o -name '*.trc' \) | head -20000) || true
-          ls -la ../out
+          python - <<'PY'
+          import os, glob, collections, numpy as np, random
+          files = sorted(glob.glob('raw/TTMD6/TTMD_cut_hum/*.csv'))
+          rows = ['file,f1,id,cls,f4,f5,nframes,ncols']
+          by = collections.defaultdict(list)
+          for p in files:
+              parts = os.path.basename(p)[:-4].split('_')
+              a = np.loadtxt(p, delimiter=',', encoding='utf-8-sig', ndmin=2)
+              rows.append(','.join([os.path.basename(p)] + parts[1:] + [str(a.shape[0]), str(a.shape[1])]))
+              by[parts[3]].append((parts[2], a))
+          open('out/index.csv', 'w').write('\n'.join(rows))
+          random.seed(1)
+          for cls, items in by.items():
+              pick = random.sample(items, min(250, len(items)))
+              np.savez_compressed(f'out/ttmd6_hum_cls{cls}.npz', **{f'm{i}': np.round(a).astype(np.int16) for i, a in pick})
+          print({k: len(v) for k, v in by.items()})
+          PY
+          ls -la out
       - name: Push to data-mocap branch
         run: |
           cd out
