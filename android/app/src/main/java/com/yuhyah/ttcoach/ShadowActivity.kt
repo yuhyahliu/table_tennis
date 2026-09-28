@@ -268,7 +268,7 @@ class ShadowActivity : ComponentActivity() {
             }
 
             // replay material: small JPEG of every other frame for the last few seconds (compressing every frame cost frame rate)
-            val keep = (frameNo++ % 2 == 0)
+            val keep = (frameNo++ % 2L == 0L)
             val jpg = if (!keep) null else {
                 val small = Bitmap.createScaledBitmap(bmp, 480, 480 * bmp.height / bmp.width, true)
                 ByteArrayOutputStream(24_000).also { small.compress(Bitmap.CompressFormat.JPEG, 65, it) }.toByteArray().also { small.recycle() }
