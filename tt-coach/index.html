@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1210">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="場邊教練">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>場邊教練</title>
+<style>
+:root{--bg:#0b1210;--panel:#121c19;--line:#24332e;--fg:#e8f0ec;--mute:#8fa39b;--acc:#34d399;--warn:#fbbf24;--bad:#f87171;--me:#34d399;--opp:#f87171}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Segoe UI",sans-serif;overscroll-behavior:none}
+button{font:inherit;color:inherit;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:12px 16px;cursor:pointer}
+button.primary{background:var(--acc);color:#052e1c;border-color:var(--acc);font-weight:700}
+button:disabled{opacity:.4}
+.screen{position:fixed;inset:0;display:none}
+.screen.on{display:flex}
+.hidden{display:none!important}
+/* home */
+#home{flex-direction:column;align-items:center;overflow:auto;padding:max(24px,env(safe-area-inset-top)) 16px 32px}
+#home .wrap{width:100%;max-width:560px}
+h1{font-size:28px;margin:8px 0 4px}
+.sub{color:var(--mute);margin:0 0 20px;line-height:1.5}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px;color:var(--mute);font-weight:600}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.row label{min-width:72px;color:var(--mute)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:8px 14px;background:transparent}
+.seg button.sel{background:#1f3b31;color:var(--acc);font-weight:700}
+ol.tips{margin:0;padding-left:20px;line-height:1.7}
+.big{display:flex;gap:10px;flex-wrap:wrap}
+.big button{flex:1 1 200px;padding:16px;font-size:17px}
+#status{color:var(--mute);min-height:1.4em;margin-top:10px;font-size:14px;line-height:1.5}
+/* stage */
+#stage{background:#000}
+#view{position:absolute;touch-action:none}
+#hud{position:absolute;left:0;right:0;top:0;display:flex;gap:6px;padding:max(6px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) 6px max(8px,env(safe-area-inset-left));pointer-events:none;flex-wrap:wrap}
+.pill{background:rgba(10,18,16,.8);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:5px 11px;font-size:14px}
+.pill b{font-size:17px}
+#cue{position:absolute;left:50%;top:calc(env(safe-area-inset-top) + 46px);transform:translateX(-50%);background:rgba(6,30,22,.92);border:2px solid var(--acc);color:#fff;border-radius:18px;padding:8px 18px;text-align:center;max-width:80vw;pointer-events:none;display:none}
+#cue.on{display:block}
+#cue .main{font-size:clamp(22px,4.4vw,40px);font-weight:800;line-height:1.2}
+#cue .detail{font-size:clamp(12px,1.8vw,15px);color:#b9cfc6;margin-top:4px}
+#cue.good{border-color:#60a5fa}
+#notes{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(620px,94vw);max-height:80vh;overflow:auto;background:rgba(10,18,16,.96);border:2px solid var(--warn);border-radius:18px;padding:16px 20px;display:none}
+#notes.on{display:block}
+#notes h3{margin:0 0 8px;font-size:18px;color:var(--warn)}
+#notes ol{margin:0;padding-left:24px;font-size:clamp(18px,3.6vw,26px);line-height:1.45;font-weight:700}
+#notes .foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:var(--mute);font-size:14px}
+#score{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;align-items:stretch;padding:6px max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+#score .pt{flex:1;font-size:20px;font-weight:800;border-width:2px;background:rgba(18,28,25,.6);min-height:54px}
+#bOpp{border-color:var(--opp);color:var(--opp)}
+#bMe{border-color:var(--me);color:var(--me)}
+#score .mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:180px}
+#board{font-size:30px;font-weight:800;letter-spacing:1px;background:rgba(0,0,0,.6);border-radius:10px;padding:0 12px;line-height:1.3}
+#board small{font-size:14px;color:var(--mute);font-weight:600;margin:0 6px}
+#score .tools{display:flex;gap:6px}
+#score .tools button{padding:6px 10px;font-size:13px;background:rgba(18,28,25,.88)}
+#calBar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;padding:8px 10px max(10px,env(safe-area-inset-bottom));justify-content:center}
+#calBar button{background:rgba(18,28,25,.9)}#calBar button.primary{background:var(--acc)}
+#calHelp{position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);background:rgba(10,18,16,.9);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font-size:16px;text-align:center;max-width:94vw}
+#calHelp small{display:block;color:var(--mute);font-size:13px;margin-top:4px}
+#calHelp ul{margin:6px 0 0;padding:0;list-style:none;text-align:left;font-size:14px;line-height:1.6}
+#log{position:absolute;right:8px;top:48px;width:min(360px,46vw);max-height:60%;overflow:auto;background:rgba(10,18,16,.94);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px 10px;font-size:13px;line-height:1.5;display:none;-webkit-user-select:text;user-select:text}
+#log.on{display:block}
+#log .item{border-bottom:1px solid rgba(255,255,255,.07);padding:4px 0}
+#log .w{color:var(--me);font-weight:700}#log .l{color:var(--opp);font-weight:700}
+#loupe{position:absolute;width:130px;height:130px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 20px rgba(0,0,0,.6);pointer-events:none;display:none}
+#rotate{position:absolute;left:10px;right:10px;top:45%;text-align:center;color:var(--warn);font-size:15px;display:none}
+@media (orientation:portrait){#rotate.need{display:block}}
+</style>
+</head>
+<body>
+
+<section id="home" class="screen on">
+  <div class="wrap">
+    <h1>場邊教練 <span style="font-size:14px;color:var(--mute);font-weight:400">v0.1</span></h1>
+    <p class="sub">給教練看的即時提示：每一分打完告訴你選手的重心、站位、步寬、離桌距離；局間整理兩三個重點讓你轉述。</p>
+
+    <div class="card">
+      <h2>設定</h2>
+      <div class="row"><label>模式</label><div class="seg" data-k="mode"><button data-v="match">比賽</button><button data-v="practice">練習</button></div></div>
+      <div class="row"><label>選手</label><div class="seg" data-k="hand"><button data-v="R">右手持拍</button><button data-v="L">左手持拍</button></div></div>
+      <div class="row"><label>語音</label><div class="seg" data-k="voice"><button data-v="off">關</button><button data-v="on">開</button></div><span style="color:var(--mute);font-size:13px">比賽建議關，或接你的藍牙耳機</span></div>
+      <div class="row"><label>辨識</label><div class="seg" data-k="model"><button data-v="lite">快速</button><button data-v="full">精準</button></div></div>
+    </div>
+
+    <div class="card">
+      <h2>手機擺放</h2>
+      <ol class="tips" id="tips"></ol>
+    </div>
+
+    <div class="big">
+      <button class="primary" id="btnCam">開始（相機）</button>
+      <button id="btnFile">用影片測試</button>
+    </div>
+    <input type="file" id="file" accept="video/*" class="hidden">
+    <div id="status"></div>
+  </div>
+</section>
+
+<section id="stage" class="screen">
+  <canvas id="view"></canvas>
+  <canvas id="loupe" width="130" height="130"></canvas>
+  <div id="hud" class="hidden">
+    <div class="pill" id="hState">等待開始</div>
+    <div class="pill">重心 <b id="hLow">–</b></div>
+    <div class="pill">站位 <b id="hPos">–</b></div>
+    <div class="pill">離桌 <b id="hDist">–</b></div>
+    <div class="pill" id="hFps">– fps</div>
+  </div>
+  <div id="cue"><div class="main"></div><div class="detail"></div></div>
+  <div id="notes"><h3 id="notesTitle">局間重點</h3><ol id="notesList"></ol><div class="foot"><span id="notesSub"></span><button id="notesClose">關閉</button></div></div>
+  <div id="log"><div style="display:flex;gap:6px;justify-content:flex-end;margin-bottom:4px"><button id="btnDl" style="padding:4px 10px;font-size:12px">下載紀錄</button><button id="btnLogClose" style="padding:4px 10px;font-size:12px">關閉</button></div><div id="logItems"></div></div>
+  <div id="calHelp" class="hidden"></div>
+  <div id="rotate">把手機橫放效果比較好</div>
+  <div id="calBar" class="hidden"><button id="cReset">重點</button><button id="cBack">返回</button><button class="primary" id="cGo" disabled>開始</button></div>
+  <div id="score" class="hidden">
+    <button class="pt" id="bOpp">對手 +1</button>
+    <div class="mid">
+      <div id="board"><span id="sMe">0</span> : <span id="sOpp">0</span><small id="sGames">局 0:0</small></div>
+      <div class="tools"><button id="tNotes">局間重點</button><button id="tLog">紀錄</button><button id="tCal">校正</button><button id="tEnd">結束</button></div>
+    </div>
+    <button class="pt" id="bMe">我方 +1</button>
+  </div>
+  <video id="video" playsinline muted class="hidden"></video>
+</section>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
