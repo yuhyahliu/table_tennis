@@ -92,14 +92,14 @@ class ShadowActivity : ComponentActivity() {
         root.addView(view, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
         tts = TextToSpeech(this) { st -> if (st == TextToSpeech.SUCCESS) tts?.setLanguage(Locale.TAIWAN) }
-        setPhase(Phase.SETUP)
+        goPhase(Phase.SETUP)
         exec.execute { createLandmarker() }
         startCamera()
     }
 
     fun say(s: String) { if (s.isNotBlank()) tts?.speak(s, TextToSpeech.QUEUE_FLUSH, null, "sh") }
 
-    fun setPhase(p: Phase) {
+    fun goPhase(p: Phase) {
         phase = p; phaseStart = clock
         when (p) {
             Phase.SETUP -> { bigText = "站到畫面中間"; smallText = "頭到腳都要拍到，離手機 2–3 公尺" }
@@ -207,8 +207,8 @@ class ShadowActivity : ComponentActivity() {
 
     private fun tick(t: Double) {
         when (phase) {
-            Phase.SETUP -> if (visibleSince > 0 && t - visibleSince > 1.0) main.post { if (phase == Phase.SETUP) setPhase(Phase.DEMO) }
-            Phase.DEMO -> if (t - phaseStart > 5.0) main.post { if (phase == Phase.DEMO) setPhase(Phase.FOLLOW) }
+            Phase.SETUP -> if (visibleSince > 0 && t - visibleSince > 1.0) main.post { if (phase == Phase.SETUP) goPhase(Phase.DEMO) }
+            Phase.DEMO -> if (t - phaseStart > 5.0) main.post { if (phase == Phase.DEMO) goPhase(Phase.FOLLOW) }
             Phase.REVIEW -> if (t - phaseStart > 14.0) main.post { if (phase == Phase.REVIEW) nextRound() }
             else -> {}
         }
@@ -233,9 +233,9 @@ class ShadowActivity : ComponentActivity() {
         val focusKey = coach.focus
         val issue = if (focusKey != null) ISSUES.first { it.key == focusKey } else coach.chooseFocus(5)
         // the swing where the issue shows most
-        val r = roundResults.maxByOrNull { it.z[issue.key] ?: 0.0 } ?: return setPhase(Phase.FOLLOW)
+        val r = roundResults.maxByOrNull { it.z[issue.key] ?: 0.0 } ?: return goPhase(Phase.FOLLOW)
         val moment = when (issue.key) { "knee_bs" -> "bs"; "elbow_imp", "upperarm_imp" -> "imp"; else -> "fin" }
-        val s = snaps[r]?.get(moment) ?: snaps[r]?.values?.firstOrNull() ?: return setPhase(Phase.FOLLOW)
+        val s = snaps[r]?.get(moment) ?: snaps[r]?.values?.firstOrNull() ?: return goPhase(Phase.FOLLOW)
         reviewIssue = issue; review = r to s
         val okCount = roundResults.count { it.focusOk == true }
         lastRoundWasFocus = focusKey != null; lastOk = okCount
@@ -248,7 +248,7 @@ class ShadowActivity : ComponentActivity() {
 
     fun onTapReview() { if (phase == Phase.REVIEW) nextRound() }
     /** after a focus round that went well (4+/5), go back to free swings and find the next thing to work on */
-    private fun nextRound() = setPhase(if (lastRoundWasFocus && lastOk >= 4) Phase.FOLLOW else Phase.FOCUS)
+    private fun nextRound() = goPhase(if (lastRoundWasFocus && lastOk >= 4) Phase.FOLLOW else Phase.FOCUS)
 
     override fun onDestroy() {
         tts?.shutdown(); exec.execute { landmarker?.close() }; exec.shutdown(); super.onDestroy()
