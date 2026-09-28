@@ -1,0 +1,23 @@
+{
+ "title": "Table Tennis MOCAP Dataset",
+ "doi": "10.6084/m9.figshare.31746358.v2",
+ "license": {
+  "value": 1,
+  "name": "CC BY 4.0",
+  "url": "https://creativecommons.org/licenses/by/4.0/"
+ },
+ "authors": [
+  {
+   "id": 23544655,
+   "full_name": "jun zhang",
+   "first_name": "jun",
+   "last_name": "zhang",
+   "is_active": true,
+   "url_name": "jun_zhang",
+   "orcid_id": ""
+  }
+ ],
+ "description": "<p dir=\"ltr\">The data of participants' forehand attack, forehand drive, forehand push, backhand attack, backhand drive and backhand push were collected by the infrared motion capture system, and the TTMD6 was made. The dataset has 8 subfolders, including 9000 skill motions' bat trajectory and 9000 skill motions' joint space position.</p>",
+ "published_date": "2026-05-02T12:13:19Z",
+ "citation": "zhang, jun (2026). Table Tennis MOCAP Dataset. figshare. Dataset. https://doi.org/10.6084/m9.figshare.31746358.v2"
+}
