@@ -107,10 +107,27 @@ class ShadowView(ctx: Context, private val a: ShadowActivity) : View(ctx) {
         if (swinging) {
             counter(c, u, now)
             if (a.phase == ShadowActivity.Phase.FOCUS) text(c, a.bigText, width / 2f, height - u * 0.07f, u * 0.085f, YELLOW)
-        } else {
-            text(c, a.bigText, width / 2f, height * 0.16f, u * 0.095f)
-            text(c, a.subText, width / 2f, height * 0.16f + u * 0.1f, u * 0.065f)
-            if (a.phase == ShadowActivity.Phase.DEMO && now - a.pulseAt < 400) text(c, "✓", width / 2f, height * 0.5f, u * 0.2f, Ui.ACC)
+        } else when (a.phase) {
+            ShadowActivity.Phase.COUNTDOWN -> {
+                val k = 3 - (a.clock - a.phaseStart).toInt()
+                if (k >= 1) text(c, "$k", width / 2f, height * 0.62f, u * 0.5f, GOLD)
+            }
+            ShadowActivity.Phase.READY -> {
+                text(c, "✋", width / 2f, height * 0.55f, u * 0.28f)
+                text(c, a.bigText, width / 2f, height * 0.16f, u * 0.11f, GOLD)
+                text(c, a.subText, width / 2f, height * 0.16f + u * 0.11f, u * 0.065f)
+            }
+            ShadowActivity.Phase.PAUSED -> {
+                p.style = Paint.Style.FILL; p.color = Color.argb(110, 0, 0, 0); c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), p)
+                if (!a.autoPaused) text(c, "Ⅱ", width / 2f, height * 0.6f, u * 0.25f)
+                text(c, a.bigText, width / 2f, height * 0.16f, u * 0.11f, Ui.WARN)
+                text(c, a.subText, width / 2f, height * 0.16f + u * 0.11f, u * 0.065f)
+            }
+            else -> {
+                text(c, a.bigText, width / 2f, height * 0.16f, u * 0.095f)
+                text(c, a.subText, width / 2f, height * 0.16f + u * 0.1f, u * 0.065f)
+                if (a.phase == ShadowActivity.Phase.DEMO && now - a.pulseAt < 400) text(c, "✓", width / 2f, height * 0.5f, u * 0.2f, Ui.ACC)
+            }
         }
         if (a.phase == ShadowActivity.Phase.SETUP && a.lastLm == null) text(c, "看不到你，退後一點", width / 2f, height * 0.55f, u * 0.08f, Ui.WARN)
         if (a.debug) drawDebug(c, u)
@@ -190,8 +207,8 @@ class ShadowView(ctx: Context, private val a: ShadowActivity) : View(ctx) {
             "wrist %.1f m/s  thr %.1f  usual %.1f".format(co.speed, co.threshold(), co.typicalSpeed()),
             "last reject: ${co.lastReject.ifEmpty { "-" }}",
             "body turn %.0f°  shadow idx ${a.ghostIdx}/${a.tpl.n}".format(a.turnDeg),
-            "counted ${a.roundDetected}  scored ${a.roundResults.size}  all ${co.results.size}") +
-            (a.roundResults.lastOrNull()?.let { r -> listOf("last z: " + r.z.entries.joinToString(" ") { "${it.key}=%.1f".format(it.value) }) } ?: emptyList())
+            "counted ${a.roundDetected}  scored ${a.roundResults.size}  all ${co.results.size}  hold=${co.hold}") +
+            (co.results.lastOrNull()?.let { r -> listOf("last: like ${(r.shape * 100).toInt()}%  z " + r.z.entries.joinToString(" ") { "${it.key}=%.1f".format(it.value) }) } ?: emptyList())
         mono.textSize = u * 0.03f
         val lh = mono.textSize * 1.25f
         p.style = Paint.Style.FILL; p.color = Color.argb(170, 0, 0, 0)

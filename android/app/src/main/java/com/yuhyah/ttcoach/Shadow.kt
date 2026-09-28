@@ -154,21 +154,26 @@ fun swingValues(local: Array<Pose>, t0: Double, dt: Double, stroke: String = "fh
 class SwingResult(
     val tImpact: Double, val stars: Int, val values: Map<String, Double>, val z: Map<String, Double>, val worst: IssueDef,
     val local: Array<Pose>, val frame: BodyFrame, val ib: Int, val i1: Int, val focusOk: Boolean?,
+    /** 0..1: how much the wrist path (sideways + up/down, the directions a camera sees well) looks like the standard stroke */
+    val shape: Double = 1.0,
 ) {
     val zmax get() = z.values.maxOrNull() ?: 0.0
 }
 
 sealed class ShadowEvent {
-    /** a swing was seen (immediately, at the peak of the swing) */
+    /** a swing was counted (right after its follow-through, once its path was checked) */
     class Detected(val t: Double, val speed: Double, val count: Int) : ShadowEvent()
-    /** its score, ~0.45 s later once the follow-through is in */
+    /** its score (sent together with Detected) */
     class Scored(val r: SwingResult) : ShadowEvent()
 }
 
 /**
- * Counts every swing of the chosen stroke the moment it happens and scores it against the template.
- * Uses only sideways and vertical wrist motion (both lie in the image plane), not depth, which is unreliable from one camera.
- * The speed threshold adapts to the player: kids swing slower than athletes.
+ * Counts swings of the chosen stroke and scores them against the template.
+ * 1. candidate = a peak of wrist speed above an adaptive threshold (kids swing slower than athletes), moving the right way sideways;
+ * 2. ~0.4 s later, once the follow-through is in, the wrist path around the peak must look like the standard stroke
+ *    (sideways + vertical only: both lie in the image plane; depth from one camera is unreliable). Waving, walking,
+ *    the return movement and random flailing fail this check and are not counted.
+ * `hold` = not listening (paused, between rounds, player walking).
  */
 class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: StrokeSpec = StrokeSpec.FOREHAND) {
     private class F(val t: Double, val p: Pose)
@@ -178,7 +183,17 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
     private var sp1 = 0.0; private var sp2 = 0.0
     private val peaks = ArrayDeque<Double>()
     var focus: String? = null
+    var hold = false
+    private var lastCand = -9.0
+    private val pendSpeed = HashMap<Double, Double>()
+    /** the standard wrist path (sideways, up) relative to the pelvis, in arm lengths, on the template grid */
+    private val tplPath: Array<DoubleArray> = tpl.build().let { g ->
+        val arm = (tpl.lengths["shP-elP"] ?: 0.28) + (tpl.lengths["elP-wrP"] ?: 0.21)
+        Array(tpl.n) { i -> doubleArrayOf((g[i][J.WR_P][0] - g[i][J.PELVIS][0]) / arm, (g[i][J.WR_P][2] - g[i][J.PELVIS][2]) / arm) }
+    }
     val results = ArrayList<SwingResult>()
+    /** candidates that failed the path check (time, shape), for tests and the debug view */
+    val shapeRejects = ArrayList<Pair<Double, Double>>()
     var count = 0; private set
     /** live wrist speed (m/s) and the current counting threshold, for the energy bar and the debug view */
     var speed = 0.0; private set
@@ -191,7 +206,7 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
     /** a "full" energy bar = the player's own typical swing speed */
     fun typicalSpeed(): Double = if (peaks.size < 3) 3.0 else pct(peaks.toList(), 0.5)
 
-    fun reset() { buf.clear(); pending.clear(); results.clear(); lastSwing = -9.0; count = 0 }
+    fun reset() { buf.clear(); pending.clear(); pendSpeed.clear(); results.clear(); lastSwing = -9.0; lastCand = -9.0; count = 0 }
     fun resetCount() { count = 0 }
     fun recentPoses(): List<Pose> = buf.map { it.p }
 
@@ -209,23 +224,26 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
                 val vel = (c.p[J.WR_P] - a.p[J.WR_P]) * (1 / dtc)
                 val lateral = vel.dot(fr.x) * spec.lateralSign     // toward the right side for this stroke?
                 when {
+                    hold -> {}
                     sp1 < thr -> lastReject = "太慢 %.1f < %.1f m/s".format(sp1, thr)
-                    b.t - lastSwing < 0.5 -> lastReject = "太接近上一下"
+                    b.t - lastSwing < MIN_GAP -> lastReject = "太接近上一下"
+                    b.t - lastCand < 0.3 -> {}                                     // same movement
                     lateral < -0.3 -> lastReject = "方向不對（收拍回來？）"
                     vel[2] < -0.8 -> lastReject = "往下揮"
-                    else -> {
-                        lastSwing = b.t; count++; pending.addLast(b.t)
-                        peaks.addLast(sp1); while (peaks.size > 8) peaks.removeFirst()
-                        lastReject = ""
-                        ev.add(ShadowEvent.Detected(b.t, sp1, count))
-                    }
+                    else -> { lastCand = b.t; pending.addLast(b.t); pendSpeed[b.t] = sp1 }
                 }
             }
             sp2 = sp1; sp1 = sp
         }
         while (pending.isNotEmpty() && t >= pending.first() + 0.42) {
-            val tp = pending.removeFirst()
-            evaluate(tp)?.let { ev.add(ShadowEvent.Scored(it)) }
+            val tp = pending.removeFirst(); val sp = pendSpeed.remove(tp) ?: 0.0
+            if (hold || tp - lastSwing < MIN_GAP) continue
+            val r = evaluate(tp) ?: continue
+            if (r.shape < SHAPE_MIN) { lastReject = "不像${spec.name}（像 %.0f%%）".format(r.shape * 100); shapeRejects.add(tp to r.shape); continue }
+            lastSwing = tp; count++; lastReject = ""
+            peaks.addLast(sp); while (peaks.size > 8) peaks.removeFirst()
+            results.add(r)
+            ev.add(ShadowEvent.Detected(tp, sp, count)); ev.add(ShadowEvent.Scored(r))
         }
         return ev
     }
@@ -253,9 +271,41 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
         // lenient on purpose: ~90% of the athletes' own strokes score 3 stars at 30 fps
         val stars = if (zmax < 2.5) 3 else if (zmax < 4.0) 2 else 1
         val fok = focus?.let { (z[it] ?: 0.0) < 1.0 }
-        val r = SwingResult(tImpact, stars, vals, z, worst, local, fr, ib, i1, fok)
-        results.add(r); return r
+        return SwingResult(tImpact, stars, vals, z, worst, local, fr, ib, i1, fok, shapeScore(local))
     }
+
+    /**
+     * how much the wrist path looks like the standard one: correlation of positions AND of velocities
+     * (the velocity term tells a swing from the same path played backwards), best of small time shifts,
+     * damped if the swing is much smaller than the standard one
+     */
+    fun shapeScore(local: Array<Pose>): Double {
+        val arm = pct(local.map { (it[J.SH_P] - it[J.EL_P]).len() + (it[J.EL_P] - it[J.WR_P]).len() }, 0.5).coerceAtLeast(0.2)
+        val kid = Array(local.size) { i -> doubleArrayOf((local[i][J.WR_P][0] - local[i][J.PELVIS][0]) / arm, (local[i][J.WR_P][2] - local[i][J.PELVIS][2]) / arm) }
+        val a = tpl.index(-0.45); val b = tpl.index(0.30)
+        val tRange = (a..b).maxOf { tplPath[it][0] } - (a..b).minOf { tplPath[it][0] }
+        fun corr(f: (Int) -> DoubleArray, g: (Int) -> DoubleArray, lo: Int, hi: Int): Double {
+            val m = hi - lo + 1
+            val fm = DoubleArray(2) { d -> (lo..hi).sumOf { f(it)[d] } / m }; val gm = DoubleArray(2) { d -> (lo..hi).sumOf { g(it)[d] } / m }
+            var sxy = 0.0; var sxx = 0.0; var syy = 0.0
+            for (i in lo..hi) { val x = f(i); val y = g(i); for (d in 0..1) { val u = x[d] - fm[d]; val w = y[d] - gm[d]; sxy += u * w; sxx += u * u; syy += w * w } }
+            return sxy / sqrt(sxx * syy + 1e-12)
+        }
+        val h = 3
+        fun vel(p: Array<DoubleArray>, i: Int) = doubleArrayOf(p[i + h][0] - p[i - h][0], p[i + h][1] - p[i - h][1])
+        var best = -1.0
+        for (lag in -12..12 step 3) {
+            val lo = max(max(a, h), h - lag); val hi = min(min(b, tpl.n - 1 - h), local.size - 1 - h - lag); if (hi - lo < 20) continue
+            val rp = corr({ kid[it + lag] }, { tplPath[it] }, lo, hi)
+            val rv = corr({ vel(kid, it + lag) }, { vel(tplPath, it) }, lo, hi)
+            val kRange = (lo..hi).maxOf { kid[it + lag][0] } - (lo..hi).minOf { kid[it + lag][0] }
+            val amp = (kRange / (tRange + 1e-9) / 0.35).coerceAtMost(1.0)
+            best = max(best, min(rp, rv) * amp)
+        }
+        return best
+    }
+
+    companion object { const val SHAPE_MIN = 0.65; const val MIN_GAP = 0.6 }
 
     /** the issue to work on after a set: the one with the largest total badness */
     fun chooseFocus(last: Int = 5): IssueDef {

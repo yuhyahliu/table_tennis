@@ -46,7 +46,8 @@ class ShadowTest {
         }
         val c = best!!
         val matched = matchedOf(c)
-        c.results.forEach { r -> println("  %s %.2fs stars=%d worst=%s z=%s | %s".format(spec.key, r.tImpact, r.stars, r.worst.key,
+        println("  shape rejects: " + c.shapeRejects.joinToString { "%.2fs:%.2f".format(it.first, it.second) })
+        c.results.forEach { r -> println("  %s %.2fs shape=%.2f stars=%d worst=%s z=%s | %s".format(spec.key, r.tImpact, r.shape, r.stars, r.worst.key,
             r.z.entries.joinToString { "${it.key}:%.1f".format(it.value) }, c.speech(r, 0))) }
         println("${spec.key}: right=${c.rightHanded} detected=$bestDet scored=${c.results.size} labelled=${hits.size} matched=$matched " +
             "stars avg=%.2f thr=%.2f typical=%.2f".format(c.results.map { it.stars }.average(), c.threshold(), c.typicalSpeed()))
@@ -61,6 +62,24 @@ class ShadowTest {
 
     @Test fun forehandAthlete() = run(StrokeSpec.FOREHAND, "fig_p01_30fps.csv.gz", 8, 2.5)
     @Test fun backhandMocap() = run(StrokeSpec.BACKHAND, "ttmd_bh_30fps.csv.gz", 8, 2.3)
+
+    /** things that are not the stroke must not be counted: the other arm, the stroke played backwards */
+    @Test fun ignoresNonStrokes() {
+        val tpl = tpl(StrokeSpec.FOREHAND)
+        val (rows, _) = session("fig_p01_30fps.csv.gz")
+        val wrongArm = ShadowCoach(tpl, false, StrokeSpec.FOREHAND)
+        for ((t, lm) in rows) wrongArm.feed(t, poseFromMpWorld(lm, false))
+        val tEnd = rows.last().first
+        val backwards = ShadowCoach(tpl, true, StrokeSpec.FOREHAND)
+        for ((t, lm) in rows.reversed()) backwards.feed(tEnd - t, poseFromMpWorld(lm, true))
+        val asBackhand = ShadowCoach(tpl(StrokeSpec.BACKHAND), true, StrokeSpec.BACKHAND)
+        for ((t, lm) in rows) asBackhand.feed(t, poseFromMpWorld(lm, true))
+        println("non-strokes counted: other arm=${wrongArm.results.size} backwards=${backwards.results.size} forehands-as-backhand=${asBackhand.results.size}")
+        println("  other arm shapes: " + wrongArm.shapeRejects.joinToString { "%.2f".format(it.second) } + " | accepted " + wrongArm.results.joinToString { "%.2f".format(it.shape) })
+        println("  backwards shapes: " + backwards.shapeRejects.joinToString { "%.2f".format(it.second) } + " | accepted " + backwards.results.joinToString { "%.2f".format(it.shape) })
+        println("  fh-as-bh shapes: " + asBackhand.shapeRejects.joinToString { "%.2f".format(it.second) } + " | accepted " + asBackhand.results.joinToString { "%.2f".format(it.shape) })
+        assertTrue(wrongArm.results.size <= 3 && backwards.results.size <= 1 && asBackhand.results.size <= 1)
+    }
 
     @Test fun phaseTrackerFollowsTheTemplate() {
         val tpl = tpl(StrokeSpec.FOREHAND)
