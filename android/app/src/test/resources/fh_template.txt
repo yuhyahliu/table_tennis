@@ -32,8 +32,8 @@ len neck-head 0.2662
 stat sh_turn 88.3480 19.1658
 stat wrist_rise 0.6499 0.1537
 stat elbow_imp 99.8275 8.0683
-stat elbow_bs 128.4085 13.3365
 stat upperarm_imp 35.4865 9.8259
 stat knee_bs 48.8895 9.8948
-stat lean_bs 22.8497 11.4968
 stat pel_turn 39.3376 12.0731
+stat contact_fwd 0.2115 0.1081
+stat elbow_fwd 0.0775 0.0898

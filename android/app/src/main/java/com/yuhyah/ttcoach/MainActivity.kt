@@ -39,12 +39,14 @@ class MainActivity : ComponentActivity() {
         root.addView(text("v${packageManager.getPackageInfo(packageName, 0).versionName} · 原生版（每秒 60 張）", 13f, Ui.MUTE))
         root.addView(text("給教練看的即時提示：每一分打完告訴你選手的重心、站位、步寬；每局鎖定一個重點，局間整理兩三件事讓你轉述。", 15f, Ui.MUTE).also { it.setPadding(0, dp(8), 0, dp(14)) })
 
-        root.addView(Button(this).apply {
-            text = "空拍練習（正手）\n用前鏡頭，跟著影子揮拍"; textSize = 20f; setTextColor(Color.parseColor("#1a1206")); isAllCaps = false
-            background = Ui.round(Color.parseColor("#ffb04a"), dp(14).toFloat())
-            setOnClickListener { withCamera { startActivity(Intent(this@MainActivity, ShadowActivity::class.java)) } }
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(92)).apply { bottomMargin = dp(14) })
-        root.addView(text("手機或平板放在前方 2–3 公尺、胸口高度，螢幕對著你。也可以把畫面投到電視。標準動作來自 34 位省隊選手的正手資料（figshare，CC BY 4.0）。", 13f, Ui.MUTE).also { it.setPadding(0, 0, 0, dp(14)) })
+        val shadowRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        for ((key, name) in listOf("fh" to "正手", "bh" to "反手")) shadowRow.addView(Button(this).apply {
+            text = "空拍練習\n$name"; textSize = 22f; setTextColor(Color.parseColor("#1a1206")); isAllCaps = false
+            background = Ui.round(Color.parseColor(if (key == "fh") "#ffb04a" else "#ffc978"), dp(14).toFloat())
+            setOnClickListener { withCamera { startActivity(Intent(this@MainActivity, ShadowActivity::class.java).putExtra("stroke", key)) } }
+        }, LinearLayout.LayoutParams(0, dp(96), 1f).apply { if (key == "fh") marginEnd = dp(10) })
+        root.addView(shadowRow, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(10) })
+        root.addView(text("用前鏡頭，跟著影子揮拍，不用球桌。手機或平板放在前方 2–3 公尺、胸口高度，也可以投到電視。每揮一下「嗶」一聲，揮滿 5 下會慢動作重播最好和最需要加油的一下。長按畫面＝教練除錯資訊。\n標準動作：正手來自 34 位省隊選手（figshare，CC BY 4.0）；反手來自 TTMD6 動作捕捉資料（figshare，CC BY 4.0）。", 13f, Ui.MUTE).also { it.setPadding(0, 0, 0, dp(14)) })
 
         val card = card(root, "設定")
         seg(card, "模式", "mode", listOf("match" to "比賽", "practice" to "練習"), "match") { v ->
