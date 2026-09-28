@@ -187,6 +187,7 @@ class ShadowActivity : ComponentActivity() {
             Phase.SETUP -> { bigText = "站到畫面中間"; subText = "頭到腳都要拍到" }
             Phase.DEMO -> { bigText = "看影子，輕輕揮兩下"; subText = ""; demoSwings = 0; say("看影子怎麼打${strokeName}，跟著輕輕揮兩下") }
             Phase.READY -> {
+                coach.resetSpeed()                 // the next player may be slower (a child after an adult)
                 bigText = "引拍準備"
                 subText = if (nextPhase == Phase.FOCUS) "這一輪只想：${focusIssue?.cue ?: ""}" else "像影子一樣把拍子拉到後面，停一下就開始"
                 say(line ?: (if (nextPhase == Phase.FOCUS) "下一輪只想一件事，${focusIssue?.cue}。站好，引拍準備就開始" else "站好，引拍準備就開始"))
@@ -267,9 +268,10 @@ class ShadowActivity : ComponentActivity() {
             val jpg = ByteArrayOutputStream(24_000).also { small.compress(Bitmap.CompressFormat.JPEG, 70, it) }.toByteArray()
             small.recycle()
             synchronized(ring) {
-                ring.addLast(ClipFrame(t, jpg, lm, aff, pose)); while (ring.isNotEmpty() && t - ring.first().t > 3.0) ring.removeFirst()
-                val done = pendingClips.filter { t >= it.tImpact + 0.55 }
-                for (r in done) { val c = ring.filter { it.t >= r.tImpact - 0.75 && it.t <= r.tImpact + 0.55 }; synchronized(clips) { clips[r] = c } }
+                ring.addLast(ClipFrame(t, jpg, lm, aff, pose)); while (ring.isNotEmpty() && t - ring.first().t > 3.5) ring.removeFirst()
+                // swing clip: from a bit before its backswing to a bit after its finish (slow swings are longer)
+                val done = pendingClips.filter { t >= it.tImpact + 0.5 * it.scale + 0.1 }
+                for (r in done) { val c = ring.filter { it.t >= r.tImpact - 0.75 * r.scale && it.t <= r.tImpact + 0.5 * r.scale }; synchronized(clips) { clips[r] = c } }
                 pendingClips.removeAll(done.toSet())
             }
 
@@ -415,7 +417,7 @@ class ShadowActivity : ComponentActivity() {
             val clip = byClip[r] ?: return@forEachIndexed
             val good = if (focus != null) r.focusOk == true else r.stars == 3
             val iss = focus ?: r.worst
-            val ft = if (good) 0.0 else when (iss.at) { "bs" -> tpl.time(r.ib); "fin" -> tpl.time(r.i1); else -> 0.0 }
+            val ft = if (good) 0.0 else when (iss.at) { "bs" -> tpl.time(r.ib) * r.scale; "fin" -> tpl.time(r.i1) * r.scale; else -> 0.0 }
             list.add(Seg(k + 1, r, clip, good, if (good) null else iss, ft, if (good) 1.2 else 2.5, if (good) "很棒！" else iss.cue))
         }
         val nGood = rs.count { if (focus != null) it.focusOk == true else it.stars == 3 }

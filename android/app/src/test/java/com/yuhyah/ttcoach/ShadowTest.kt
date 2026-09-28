@@ -109,6 +109,19 @@ class ShadowTest {
         }
     }
 
+    /** small / far-away players and slow phones: jittery landmarks (4 cm), 15 fps, and a 1.5× slower swing still count */
+    @Test fun robustToNoiseLowFpsAndSlowSwings() {
+        val tpl = tpl(StrokeSpec.FOREHAND)
+        val (rows, hits) = session("fig_p01_30fps.csv.gz")
+        val rnd = java.util.Random(7)
+        val c = ShadowCoach(tpl, true, StrokeSpec.FOREHAND)
+        rows.filterIndexed { i, _ -> i % 2 == 0 }.forEach { (t, lm) ->
+            c.feed(t * 1.5, poseFromMpWorld(lm.map { doubleArrayOf(it[0] + rnd.nextGaussian() * 0.04, it[1] + rnd.nextGaussian() * 0.04, it[2] + rnd.nextGaussian() * 0.08) }, true)) }
+        val m = hits.count { h -> c.results.any { abs(it.tImpact - h * 1.5) < 0.3 } }
+        println("noisy+15fps+slow: counted=${c.results.size} matched=$m/10 tempo=" + c.results.joinToString(" ") { "%.2f".format(it.scale) })
+        assertTrue(m >= 8)
+    }
+
     @Test fun phaseTrackerFollowsTheTemplate() {
         val tpl = tpl(StrokeSpec.FOREHAND)
         val g = tpl.build()

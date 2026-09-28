@@ -234,7 +234,7 @@ class ShadowView(ctx: Context, private val a: ShadowActivity) : View(ctx) {
             "last reject: ${co.lastReject.ifEmpty { "-" }}",
             "body turn %.0f°  shadow idx ${a.ghostIdx}/${a.tpl.n}".format(a.turnDeg),
             "counted ${a.roundDetected}  scored ${a.roundResults.size}  all ${co.results.size}  hold=${co.hold}") +
-            (co.results.lastOrNull()?.let { r -> listOf("last: like ${(r.shape * 100).toInt()}%  z " + r.z.entries.joinToString(" ") { "${it.key}=%.1f".format(it.value) }) } ?: emptyList())
+            (co.results.lastOrNull()?.let { r -> listOf("last: like ${(r.shape * 100).toInt()}%  tempo x%.2f  z ".format(r.scale) + r.z.entries.joinToString(" ") { "${it.key}=%.1f".format(it.value) }) } ?: emptyList())
         mono.textSize = u * 0.03f
         val lh = mono.textSize * 1.25f
         p.style = Paint.Style.FILL; p.color = Color.argb(170, 0, 0, 0)

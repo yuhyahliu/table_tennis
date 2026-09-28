@@ -188,6 +188,8 @@ class SwingResult(
     val local: Array<Pose>, val frame: BodyFrame, val ib: Int, val i1: Int, val focusOk: Boolean?,
     /** 0..1: how much the wrist path (sideways + up/down, the directions a camera sees well) looks like the standard stroke */
     val shape: Double = 1.0,
+    /** how much slower than the standard stroke (1 = same speed); template time × scale = real seconds */
+    val scale: Double = 1.0,
 ) {
     val zmax get() = z.values.maxOrNull() ?: 0.0
 }
@@ -235,41 +237,58 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
 
     fun threshold(): Double {
         if (peaks.size < 3) return 1.0
-        return (0.45 * pct(peaks.toList(), 0.5)).coerceIn(0.8, 2.5)
+        return (0.45 * pct(peaks.toList(), 0.5)).coerceIn(0.8, 1.8)
     }
     /** a "full" energy bar = the player's own typical swing speed */
     fun typicalSpeed(): Double = if (peaks.size < 3) 3.0 else pct(peaks.toList(), 0.5)
 
     fun reset() { buf.clear(); pending.clear(); pendSpeed.clear(); results.clear(); lastSwing = -9.0; lastCand = -9.0; count = 0 }
     fun resetCount() { count = 0 }
+    /** forget the speed history (a different, maybe slower player may be next — e.g. a child after an adult) */
+    fun resetSpeed() { peaks.clear() }
     fun recentPoses(): List<Pose> = buf.map { it.p }
+
+    /** racket wrist averaged over 5 frames around k: small or far-away players give jittery landmarks */
+    private fun sw(k: Int): DoubleArray {
+        val lo = max(0, k - 2); val hi = min(buf.size - 1, k + 2); val o = doubleArrayOf(0.0, 0.0, 0.0)
+        for (i in lo..hi) { val w = buf[i].p[J.WR_P]; o[0] += w[0]; o[1] += w[1]; o[2] += w[2] }
+        val n = (hi - lo + 1).toDouble(); o[0] /= n; o[1] /= n; o[2] /= n; return o
+    }
+    private var vel1 = doubleArrayOf(0.0, 0.0, 0.0); private var k1t = 0.0; private var k1p: Pose? = null
 
     fun feed(t: Double, p: Pose): List<ShadowEvent> {
         val ev = ArrayList<ShadowEvent>()
         buf.addLast(F(t, p)); while (buf.isNotEmpty() && t - buf.first().t > 2.5) buf.removeFirst()
-        if (buf.size >= 3) {
-            val a = buf[buf.size - 3]; val b = buf[buf.size - 2]; val c = buf[buf.size - 1]
-            val dtc = max(1e-3, c.t - a.t)
-            val sp = (c.p[J.WR_P] - a.p[J.WR_P]).len() / dtc
+        val k = buf.size - 4                                        // speed is known 4 frames late (smoothing needs 2 frames ahead)
+        if (k >= 3) {
+            val dtc = max(1e-3, buf[k + 1].t - buf[k - 1].t)
+            val vel = (sw(k + 1) - sw(k - 1)) * (1 / dtc)
+            val sp = vel.len()
             speed = sp
-            if (sp1 > sp2 && sp1 >= sp) {                        // local maximum at b
+            val bp = k1p
+            if (sp1 > sp2 && sp1 >= sp && bp != null) {            // local maximum one frame back
                 val thr = threshold()
-                val fr = BodyFrame.of(b.p, rightHanded)
-                val vel = (c.p[J.WR_P] - a.p[J.WR_P]) * (1 / dtc)
-                val lateral = vel.dot(fr.x) * spec.lateralSign     // toward the right side for this stroke?
+                val fr = BodyFrame.of(bp, rightHanded)
+                val lateral = vel1.dot(fr.x) * spec.lateralSign    // toward the right side for this stroke?
+                val bt = k1t
                 when {
                     hold -> {}
                     sp1 < thr -> lastReject = "太慢 %.1f < %.1f m/s".format(sp1, thr)
-                    b.t - lastSwing < MIN_GAP -> lastReject = "太接近上一下"
-                    b.t - lastCand < 0.3 -> {}                                     // same movement
+                    bt - lastSwing < MIN_GAP -> lastReject = "太接近上一下"
                     lateral < -0.3 -> lastReject = "方向不對（收拍回來？）"
-                    vel[2] < -0.8 -> lastReject = "往下揮"
-                    else -> { lastCand = b.t; pending.addLast(b.t); pendSpeed[b.t] = sp1 }
+                    vel1[2] < -0.8 -> lastReject = "往下揮"
+                    bt - lastCand < 0.35 -> {                         // same movement: keep the stronger peak
+                        val last = pending.lastOrNull()
+                        if (last != null && last == lastCand && sp1 > (pendSpeed[last] ?: 0.0)) {
+                            pending.removeLast(); pendSpeed.remove(last); pending.addLast(bt); pendSpeed[bt] = sp1; lastCand = bt
+                        }
+                    }
+                    else -> { lastCand = bt; pending.addLast(bt); pendSpeed[bt] = sp1 }
                 }
             }
-            sp2 = sp1; sp1 = sp
+            sp2 = sp1; sp1 = sp; vel1 = vel; k1t = buf[k].t; k1p = buf[k].p
         }
-        while (pending.isNotEmpty() && t >= pending.first() + 0.42) {
+        while (pending.isNotEmpty() && t >= pending.first() + EVAL_DELAY) {
             val tp = pending.removeFirst(); val sp = pendSpeed.remove(tp) ?: 0.0
             if (hold || tp - lastSwing < MIN_GAP) continue
             val r = evaluate(tp) ?: continue
@@ -289,9 +308,27 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
         return Array(14) { j -> a.p[j] * (1 - w) + b.p[j] * w }
     }
 
+    /**
+     * Kids swing slower than athletes: the stroke is compared at a few speeds (template time × scale) and the best
+     * match is used, so all values are measured on the player's own timing.
+     */
     private fun evaluate(tImpact: Double): SwingResult? {
-        if (buf.isEmpty() || buf.first().t > tImpact + tpl.t0 + 0.1) return null
-        val world = Array(tpl.n) { i -> sample(tImpact + tpl.time(i)) }
+        var best: SwingResult? = null
+        for (sc in SCALES) {
+            if (buf.isEmpty() || buf.first().t > tImpact + tpl.t0 * sc + 0.1) continue
+            val r = evaluateAt(tImpact, sc)
+            if (best == null || r.shape > best.shape + 0.02) best = r       // prefer real-time speed on near ties
+        }
+        return best
+    }
+
+    private fun evaluateAt(tImpact: Double, sc: Double): SwingResult {
+        val raw = Array(tpl.n) { i -> sample(tImpact + tpl.time(i) * sc) }
+        // ±50 ms moving average: removes landmark jitter, keeps the stroke (≈1 s long)
+        val world = Array(tpl.n) { i ->
+            val lo = max(0, i - 6); val hi = min(tpl.n - 1, i + 6); val m = (hi - lo + 1).toDouble()
+            Array(14) { j -> val o = doubleArrayOf(0.0, 0.0, 0.0); for (q in lo..hi) { o[0] += raw[q][j][0]; o[1] += raw[q][j][1]; o[2] += raw[q][j][2] }; o[0] /= m; o[1] /= m; o[2] /= m; o }
+        }
         var fr = BodyFrame.of(world[tpl.impact], rightHanded)
         // forward = the way the wrist travels through impact (robust to left/right conventions)
         val a = world[tpl.index(-0.25)][J.WR_P]; val b = world[tpl.index(0.1)][J.WR_P]
@@ -312,7 +349,7 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
         // lenient on purpose: ~90% of the athletes' own strokes score 3 stars at 30 fps
         val stars = if (zmax < 2.5) 3 else if (zmax < 4.0) 2 else 1
         val fok = focus?.let { (z[it] ?: 0.0) < 1.0 }
-        return SwingResult(tImpact, stars, vals, z, worst, local, fr, ib, i1, fok, shapeScore(local))
+        return SwingResult(tImpact, stars, vals, z, worst, local, fr, ib, i1, fok, shapeScore(local), sc)
     }
 
     /**
@@ -323,7 +360,7 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
     fun shapeScore(local: Array<Pose>): Double {
         val arm = pct(local.map { (it[J.SH_P] - it[J.EL_P]).len() + (it[J.EL_P] - it[J.WR_P]).len() }, 0.5).coerceAtLeast(0.2)
         val kid = Array(local.size) { i -> doubleArrayOf((local[i][J.WR_P][0] - local[i][J.PELVIS][0]) / arm, (local[i][J.WR_P][2] - local[i][J.PELVIS][2]) / arm) }
-        val a = tpl.index(-0.45); val b = tpl.index(0.30)
+        val a = tpl.index(-0.35); val b = tpl.index(0.20)
         val tRange = (a..b).maxOf { tplPath[it][0] } - (a..b).minOf { tplPath[it][0] }
         fun corr(f: (Int) -> DoubleArray, g: (Int) -> DoubleArray, lo: Int, hi: Int): Double {
             val m = hi - lo + 1
@@ -335,7 +372,7 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
         val h = 3
         fun vel(p: Array<DoubleArray>, i: Int) = doubleArrayOf(p[i + h][0] - p[i - h][0], p[i + h][1] - p[i - h][1])
         var best = -1.0
-        for (lag in -12..12 step 3) {
+        for (lag in -24..24 step 3) {
             val lo = max(max(a, h), h - lag); val hi = min(min(b, tpl.n - 1 - h), local.size - 1 - h - lag); if (hi - lo < 20) continue
             val rp = corr({ kid[it + lag] }, { tplPath[it] }, lo, hi)
             val rv = corr({ vel(kid, it + lag) }, { vel(tplPath, it) }, lo, hi)
@@ -346,7 +383,7 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
         return best
     }
 
-    companion object { const val SHAPE_MIN = 0.65; const val MIN_GAP = 0.6 }
+    companion object { const val SHAPE_MIN = 0.65; const val MIN_GAP = 0.6; val SCALES = listOf(1.0, 0.8, 1.25, 1.6); const val EVAL_DELAY = 0.55 }
 
     /** the issue to work on after a set: the one with the largest total badness */
     fun chooseFocus(last: Int = 5): IssueDef {
@@ -447,13 +484,13 @@ fun placeOn(local: Pose, kid: Pose, rightHanded: Boolean): Pose {
 
 /** template grid index to show at time dt (s, relative to the player's impact) so the shadow hits, finishes when they do */
 fun warpIndex(tpl: Template, r: SwingResult, dt: Double): Int {
-    val kb = tpl.time(r.ib); val kf = tpl.time(r.i1)
+    val kb = tpl.time(r.ib) * r.scale; val kf = tpl.time(r.i1) * r.scale
     val gb = tpl.backswingT; val gf = tpl.finishT
     val tau = when {
-        dt <= kb -> gb + (dt - kb)
+        dt <= kb -> gb + (dt - kb) / r.scale
         dt <= 0 -> if (kb < -1e-6) gb * (dt / kb) else 0.0
         dt <= kf -> if (kf > 1e-6) gf * (dt / kf) else 0.0
-        else -> gf + (dt - kf)
+        else -> gf + (dt - kf) / r.scale
     }
     return tpl.index(tau)
 }
