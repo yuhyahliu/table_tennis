@@ -1,0 +1,53 @@
+# Downloads the CC BY 4.0 "Table Tennis Forehand Stroke Mediapipe Datasets" (figshare 28881086,
+# 34 provincial athletes, 100 fps, MediaPipe 3D landmarks) and stores a CSV copy on the data-figshare branch.
+# Run manually: Actions -> Fetch Figshare forehand data -> Run workflow.
+name: Fetch Figshare forehand data
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download and convert
+        run: |
+          pip install -q pandas openpyxl requests
+          python - <<'PY'
+          import requests, os, io, json, gzip, pandas as pd
+          art = requests.get('https://api.figshare.com/v2/articles/28881086', timeout=60).json()
+          os.makedirs('out', exist_ok=True)
+          meta = {k: art.get(k) for k in ['title','doi','license','authors','description','published_date','citation']}
+          json.dump(meta, open('out/META.json','w'), ensure_ascii=False, indent=1)
+          lines = []
+          for f in art['files']:
+              name = f['name']; url = f['download_url']
+              b = requests.get(url, timeout=300).content
+              safe = name.replace('/', '__')
+              lines.append(f"{name}\t{len(b)}")
+              if name.lower().endswith('.xlsx'):
+                  xl = pd.read_excel(io.BytesIO(b), sheet_name=None)
+                  for sh, df in xl.items():
+                      p = f"out/{safe[:-5]}__{sh}.csv.gz"
+                      df.to_csv(p, index=False, compression='gzip')
+                      lines.append(f"  sheet {sh}: {df.shape} cols={list(df.columns)[:12]}")
+              else:
+                  open('out/' + safe, 'wb').write(b)
+          open('out/SUMMARY.txt','w').write('\n'.join(lines))
+          print('\n'.join(lines[:80]))
+          PY
+      - name: Push to data-figshare branch
+        run: |
+          cd out
+          cat > README.md <<'MD'
+          Data: "Table Tennis Forehand Stroke Mediapipe Datasets" by LyuLyu, figshare, DOI 10.6084/m9.figshare.28881086,
+          licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Converted from xlsx to csv.gz; values unchanged.
+          MD
+          git init -q -b data-figshare
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -q -m "Figshare 28881086 (CC BY 4.0) converted to CSV"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data-figshare
