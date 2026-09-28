@@ -39,7 +39,7 @@ import kotlin.math.max
 
 /**
  * 空拍練習（小孩畫面）: front camera, mirrored like a mirror. Flow:
- * SETUP (whole body visible, stand at the right angle) → DEMO (watch the shadow, 2 warm-up swings)
+ * SETUP (whole body visible; any natural stance, only fully side-on is corrected) → DEMO (watch the shadow, 2 warm-up swings)
  * → READY: walk into place, hold the backswing (引拍) like the frozen shadow = start (the coach can also tap: 3-2-1)
  * → FOLLOW: each real swing beeps + big counter + colour/stars/short voice
  * → after 5: REVIEW carousel of all 5 swings (slow motion + shadow, good ones green, others freeze with arrow + 口訣),
@@ -103,7 +103,7 @@ class ShadowActivity : ComponentActivity() {
     private var movingUntil = 0.0
     private var log: SessionLog? = null
     private var lastLoggedReject = ""
-    private var frames = 0; private var fpsT0 = 0.0
+    private var frames = 0; private var fpsT0 = 0.0; private var frameNo = 0L
 
     // ---- round state (main thread) ----
     val roundResults = ArrayList<SwingResult>()
@@ -178,8 +178,10 @@ class ShadowActivity : ComponentActivity() {
     private fun beep() { try { tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 70) } catch (_: Exception) {} }
 
     val strokeName get() = spec.name
-    private val wantAngle get() = if (spec.key == "bh") 0.0..45.0 else 25.0..65.0
-    private val angleHint get() = if (spec.key == "bh") "面向手機站好" else "身體站斜一點，像站在球桌前"
+    /** stand as at the table with the phone on the far side: any natural stance works; only fully side-on hides the racket arm */
+    private val angleOk get() = turnSmooth < 70.0
+    private val angleHint = "身體轉回來一點，面對手機"
+    @Volatile var turnSmooth = 0.0
 
     fun goPhase(p: Phase, line: String? = null, resume: Boolean = false) {
         phase = p; phaseStart = clock; readySince = -1.0; readyFrac = 0f
@@ -219,7 +221,7 @@ class ShadowActivity : ComponentActivity() {
         future.addListener({
             val provider = future.get()
             val res = ResolutionSelector.Builder().setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
-                .setResolutionStrategy(ResolutionStrategy(Size(1280, 720), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER)).build()
+                .setResolutionStrategy(ResolutionStrategy(Size(960, 540), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER)).build()   // enough for the pose model; faster
             val pv = Preview.Builder().setResolutionSelector(res).build().also { it.setSurfaceProvider(preview.surfaceProvider) }
             val an = ImageAnalysis.Builder().setResolutionSelector(res).setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888).build().also { it.setAnalyzer(exec) { img -> analyze(img) } }
@@ -259,18 +261,20 @@ class ShadowActivity : ComponentActivity() {
             val zup = world.map { mpWorldToZUp(it[0], it[1], it[2]) }
             val aff = Affine.fit(zup, lm.map { doubleArrayOf(it[0].toDouble(), it[1].toDouble()) }, lm.map { maxOf(0.05, it[2].toDouble()) })
             lastLm = lm; lastAff = aff
-            turnDeg = bodyTurnDeg(world)
+            turnDeg = bodyTurnDeg(world); turnSmooth = 0.9 * turnSmooth + 0.1 * turnDeg     // depth is noisy: smooth it
             log?.let { L ->
                 L.frame(t, listOf(FloatArray(33 * 4) { k -> val q = n[k / 4]; when (k % 4) { 0 -> q.x(); 1 -> q.y(); 2 -> q.z(); else -> q.visibility().orElse(0f) } }), 0,
                     FloatArray(33 * 3) { k -> val q = w[k / 3]; when (k % 3) { 0 -> q.x(); 1 -> q.y(); else -> q.z() } })
             }
 
-            // replay material: small JPEG of every frame for the last few seconds
-            val small = Bitmap.createScaledBitmap(bmp, 480, 480 * bmp.height / bmp.width, true)
-            val jpg = ByteArrayOutputStream(24_000).also { small.compress(Bitmap.CompressFormat.JPEG, 70, it) }.toByteArray()
-            small.recycle()
+            // replay material: small JPEG of every other frame for the last few seconds (compressing every frame cost frame rate)
+            val keep = (frameNo++ % 2 == 0)
+            val jpg = if (!keep) null else {
+                val small = Bitmap.createScaledBitmap(bmp, 480, 480 * bmp.height / bmp.width, true)
+                ByteArrayOutputStream(24_000).also { small.compress(Bitmap.CompressFormat.JPEG, 65, it) }.toByteArray().also { small.recycle() }
+            }
             synchronized(ring) {
-                ring.addLast(ClipFrame(t, jpg, lm, aff, pose)); while (ring.isNotEmpty() && t - ring.first().t > 3.5) ring.removeFirst()
+                if (jpg != null) { ring.addLast(ClipFrame(t, jpg, lm, aff, pose)); while (ring.isNotEmpty() && t - ring.first().t > 3.5) ring.removeFirst() }
                 // swing clip: from a bit before its backswing to a bit after its finish (slow swings are longer)
                 val done = pendingClips.filter { t >= it.tImpact + 0.5 * it.scale + 0.1 }
                 for (r in done) { val c = ring.filter { it.t >= r.tImpact - 0.75 * r.scale && it.t <= r.tImpact + 0.5 * r.scale }; synchronized(clips) { clips[r] = c } }
@@ -280,7 +284,7 @@ class ShadowActivity : ComponentActivity() {
             // whole body visible? standing at the right angle?
             val body = listOf(27, 28, 0).all { lm[it][2] > 0.5 && lm[it][1] in 0.02f..0.99f }
             visibleSince = if (body) (if (visibleSince < 0) t else visibleSince) else -1.0
-            angleOkSince = if (body && turnDeg in wantAngle) (if (angleOkSince < 0) t else angleOkSince) else -1.0
+            angleOkSince = if (body && angleOk) (if (angleOkSince < 0) t else angleOkSince) else -1.0
             lostSince = if (body) -1.0 else (if (lostSince < 0) t else lostSince)
             // 引拍準備 (hold the backswing, whole body in the picture) = start / continue
             val waiting = phase == Phase.READY || (phase == Phase.PAUSED && !autoPaused)
@@ -346,7 +350,7 @@ class ShadowActivity : ComponentActivity() {
             Phase.SETUP -> {
                 if (visibleSince > 0 && t - visibleSince > 1.0) {
                     val ok = angleOkSince > 0 && t - angleOkSince > 0.8
-                    val waited = t - visibleSince > 8.0              // depth is noisy: don't get stuck here
+                    val waited = t - visibleSince > 5.0              // depth is noisy: never get stuck here
                     if (ok || waited) main.post { if (phase == Phase.SETUP) goPhase(Phase.DEMO) }
                     else {
                         main.post { if (phase == Phase.SETUP) { bigText = angleHint; subText = "" } }
@@ -411,7 +415,7 @@ class ShadowActivity : ComponentActivity() {
         roundOk = rs.count { it.focusOk == true }
         val issue = focus ?: coach.chooseFocus(rs.size)
         val zOf = { r: SwingResult -> r.z[issue.key] ?: 0.0 }
-        val byClip = synchronized(clips) { rs.filter { (clips[it]?.size ?: 0) > 8 }.associateWith { clips[it]!! } }
+        val byClip = synchronized(clips) { rs.filter { (clips[it]?.size ?: 0) > 4 }.associateWith { clips[it]!! } }
         roundAllGood = if (focus != null) roundOk >= 4 else rs.all { it.stars == 3 } && rs.maxOf(zOf) < 1.5
         focusIssue = issue
         // the next focus round asks for a step from where the player is now, not the athletes' level at once

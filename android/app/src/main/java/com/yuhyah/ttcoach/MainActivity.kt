@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
             setOnClickListener { withCamera { startActivity(Intent(this@MainActivity, ShadowActivity::class.java).putExtra("stroke", key)) } }
         }, LinearLayout.LayoutParams(0, dp(96), 1f).apply { if (key == "fh") marginEnd = dp(10) })
         root.addView(shadowRow, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(10) })
-        root.addView(text("用前鏡頭，跟著影子揮拍，不用球桌。手機或平板放在前方 2–3 公尺、胸口高度，也可以投到電視。站好後像影子一樣「引拍」停一下＝開始（教練也可點螢幕）；練習中點一下＝暫停，走出畫面也會自動暫停。只有像樣的揮拍才會「嗶」一聲計數；揮滿 5 下，五下輪流慢動作播放、每下都有診斷，看夠了點「下一輪」。長按畫面＝教練除錯資訊。\n標準動作：正手來自 34 位省隊選手（figshare，CC BY 4.0）；反手來自 TTMD6 動作捕捉資料（figshare，CC BY 4.0）。", 13f, Ui.MUTE).also { it.setPadding(0, 0, 0, dp(14)) })
+        root.addView(text("用前鏡頭，跟著影子揮拍，不用球桌。手機或平板放在前方 2–3 公尺、胸口高度（把它當成球桌對面），照平常打球的方式站就好，全身入鏡、盡量站近讓人佔畫面大半；也可以投到電視。站好後像影子一樣「引拍」停一下＝開始（教練也可點螢幕）；練習中點一下＝暫停，走出畫面也會自動暫停。只有像樣的揮拍才會「嗶」一聲計數；揮滿 5 下，五下輪流慢動作播放、每下都有診斷，看夠了點「下一輪」。長按畫面＝教練除錯資訊。\n標準動作：正手來自 34 位省隊選手（figshare，CC BY 4.0）；反手來自 TTMD6 動作捕捉資料（figshare，CC BY 4.0）。", 13f, Ui.MUTE).also { it.setPadding(0, 0, 0, dp(14)) })
 
         val card = card(root, "設定")
         seg(card, "模式", "mode", listOf("match" to "比賽", "practice" to "練習"), "match") { v ->
