@@ -1,0 +1,173 @@
+Participants.xlsx	11814
+  sheet Sheet1: (34, 11) cols=['ID', 'Birthday', 'Age', 'Height', 'Weight', 'Grade', 'Playing-side', 'Grip', 'Rubber_forehand', 'Rubber_backhand', 'Playing_Style']
+001 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	2568788
+  sheet Sheet1: (2041, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5776
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+004 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3063962
+  sheet Sheet1: (2430, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5785
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+007 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3105854
+  sheet Sheet1: (2466, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5770
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+010 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	2477354
+  sheet Sheet1: (1970, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5776
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+013 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	2535865
+  sheet Sheet1: (2015, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5791
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+016 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3245594
+  sheet Sheet1: (2576, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5785
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+019 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	2713256
+  sheet Sheet1: (2157, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5761
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+022 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3158985
+  sheet Sheet1: (2509, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5769
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+025 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3053832
+  sheet Sheet1: (2424, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5773
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+028 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	2664257
+  sheet Sheet1: (2119, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5774
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+031 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3463733
+  sheet Sheet1: (2747, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5752
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+034 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3384341
+  sheet Sheet1: (2683, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5777
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+037 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	2640402
+  sheet Sheet1: (2097, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5757
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+040 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	2894599
+  sheet Sheet1: (2300, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5778
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+043 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	2779084
+  sheet Sheet1: (2206, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5777
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+046 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3212263
+  sheet Sheet1: (2549, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5789
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+049 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3101664
+  sheet Sheet1: (2461, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5767
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+052 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3912708
+  sheet Sheet1: (3099, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5777
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+055 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3619922
+  sheet Sheet1: (2868, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5774
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+058 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	4110099
+  sheet Sheet1: (3259, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5777
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+061 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3841889
+  sheet Sheet1: (3045, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5771
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+064 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	4709917
+  sheet Sheet1: (3737, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5780
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+067 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3782263
+  sheet Sheet1: (2998, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5770
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+070 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	2586437
+  sheet Sheet1: (2052, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5748
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+073 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3371585
+  sheet Sheet1: (2671, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5743
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+076 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	3577074
+  sheet Sheet1: (2831, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5774
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+079 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	4390643
+  sheet Sheet1: (3483, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5791
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+082 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	4059365
+  sheet Sheet1: (3221, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5785
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+085 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	5015508
+  sheet Sheet1: (3975, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5777
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+088 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	4907624
+  sheet Sheet1: (3888, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5796
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+091 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	5923347
+  sheet Sheet1: (4696, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5789
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+094 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	4731978
+  sheet Sheet1: (3747, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5779
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+097 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	4470733
+  sheet Sheet1: (3541, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5781
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+100 step1_track.xlsx skipped (raw, step2 is the filtered copy)
+step2_filtered.xlsx	5329493
+  sheet Sheet1: (4214, 99) cols=['p_0_x', 'p_0_y', 'p_0_z', 'p_1_x', 'p_1_y', 'p_1_z', 'p_2_x', 'p_2_y', 'p_2_z', 'p_3_x', 'p_3_y', 'p_3_z']
+step3_segments_fly_hit.xlsx	5789
+  sheet Sheet1: (10, 15) cols=['in', 'out', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4', 'x5', 'y5']
+speed_final.csv	34987

@@ -1,0 +1,23 @@
+{
+ "title": "Table Tennis Forehand Stroke Mediapipe Datasets",
+ "doi": "10.6084/m9.figshare.28881086.v2",
+ "license": {
+  "value": 1,
+  "name": "CC BY 4.0",
+  "url": "https://creativecommons.org/licenses/by/4.0/"
+ },
+ "authors": [
+  {
+   "id": 21187193,
+   "full_name": "Lyu",
+   "first_name": "",
+   "last_name": "Lyu",
+   "is_active": true,
+   "url_name": "Lyu",
+   "orcid_id": ""
+  }
+ ],
+ "description": "<h2>Dataset Structure</h2><h3>1. Participants.xlsx</h3><p dir=\"ltr\">Contains characteristics for 34 provincial-level athletes.</p><h3>2. Stroke_Data</h3><p dir=\"ltr\">Forehand stroke data for each participant.</p><p dir=\"ltr\">● step1_track.xlsx: Raw 3D position data for 33 landmarks (captured via MediaPipe).</p><p dir=\"ltr\">● step2_filtered.xlsx: Filtered position data.</p><p dir=\"ltr\">● step3_segments_fly_hit.xlsx:</p><p dir=\"ltr\">Labels each stroke's in/out frames in long-format data.</p><p dir=\"ltr\">Marks the ball's (x, y) coordinates 6 frames before exiting the video frame.</p><p dir=\"ltr\">Identifies the ball-racket impact frame.</p><h3>3. Ball_Speed_Model</h3><p dir=\"ltr\">Dataset for training/evaluating the ball speed prediction model.</p><h3><br></h3><p><br></p>",
+ "published_date": "2025-08-04T15:03:04Z",
+ "citation": "Lyu (2025). Table Tennis Forehand Stroke Mediapipe Datasets. figshare. Dataset. https://doi.org/10.6084/m9.figshare.28881086.v2"
+}
