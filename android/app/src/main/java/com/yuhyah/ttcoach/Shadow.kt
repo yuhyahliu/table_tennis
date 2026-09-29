@@ -123,11 +123,12 @@ class StrokeSpec(val key: String, val name: String, val asset: String, val later
             IssueDef("elbow_imp", +1, "手臂彎，像抱一顆大氣球", "手臂有彎，好棒！", J.WR_P, "imp"),
             IssueDef("upperarm_imp", +1, "手肘靠近身體，夾一張紙", "手肘有夾住，好棒！", J.EL_P, "imp"),
             IssueDef("pel_turn", -1, "屁股也要跟著轉", "屁股有轉，好棒！", J.HIP_P, "fin", turn = true)))
-        val BACKHAND = StrokeSpec("bh", "反手", "bh_template.txt", +1, listOf(
+        /** backhand topspin (反手拉球): TTMD6 class 5 — low backswing, steep upward brush */
+        val BACKHAND = StrokeSpec("bh", "反手拉球", "bh_template.txt", +1, listOf(
             IssueDef("knee_bs", -1, "膝蓋彎，像坐高腳椅", "膝蓋有彎，好棒！", J.PELVIS, "bs"),
-            IssueDef("contact_fwd", -1, "在身體前面打球", "有在前面打，好棒！", J.WR_P, "imp", depth = true),
-            IssueDef("elbow_fwd", -1, "手肘放在肚子前面", "手肘位置很好！", J.EL_P, "imp", depth = true),
-            IssueDef("wrist_rise", -1, "球拍往前上方送出去", "有往前送，好棒！", J.WR_P, "fin")))
+            IssueDef("wrist_rise", -1, "拍子從膝蓋前面往上拉到額頭", "有往上拉，好棒！", J.WR_P, "fin"),
+            IssueDef("contact_fwd", -1, "在身體前面擊球", "有在前面擊球，好棒！", J.WR_P, "imp", depth = true),
+            IssueDef("elbow_fwd", -1, "手肘在身體前面，當轉軸", "手肘位置很好！", J.EL_P, "imp", depth = true)))
         fun of(key: String?) = if (key == "bh") BACKHAND else FOREHAND
     }
 }
@@ -501,19 +502,26 @@ class PhaseTracker(tpl: Template, private val rightHanded: Boolean) {
 class BackswingPose(tpl: Template, private val rightHanded: Boolean) {
     val index = tpl.index(tpl.backswingT)
     private val target: DoubleArray
+    private val elbowTarget: Double
     /** how close counts as "in the backswing": tighter for compact strokes (backhand) whose contact is near the backswing */
     val near: Double
     init {
         val all = tpl.build(); val g = all[index]
         val arm = (tpl.lengths["shP-elP"] ?: 0.28) + (tpl.lengths["elP-wrP"] ?: 0.21)
         target = doubleArrayOf((g[J.WR_P][0] - g[J.PELVIS][0]) / arm, (g[J.WR_P][2] - g[J.PELVIS][2]) / arm)
+        elbowTarget = elbow(g)
         near = min(0.3, 0.6 * distance(all[tpl.impact], arm))
     }
+    private fun elbow(p: Pose): Double {
+        val u = p[J.SH_P] - p[J.EL_P]; val w = p[J.WR_P] - p[J.EL_P]
+        return acos((u.dot(w) / (u.len() * w.len() + 1e-9)).coerceIn(-1.0, 1.0)) * 180 / PI
+    }
+    /** racket-wrist position (sideways + height, arm lengths) plus how differently the elbow is bent (a hanging straight arm is not a backswing) */
     fun distance(kid: Pose, kidArm: Double): Double {
         val fr = BodyFrame.of(kid, rightHanded)
         val w = fr.toLocal(kid[J.WR_P]); val pv = fr.toLocal(kid[J.PELVIS])
         val dx = (w[0] - pv[0]) / kidArm - target[0]; val dz = (w[2] - pv[2]) / kidArm - target[1]
-        return sqrt(dx * dx + dz * dz)
+        return sqrt(dx * dx + dz * dz) + 0.5 * abs(elbow(kid) - elbowTarget) / 90.0
     }
 }
 
