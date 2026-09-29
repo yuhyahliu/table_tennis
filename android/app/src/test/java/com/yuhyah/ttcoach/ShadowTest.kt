@@ -40,6 +40,8 @@ class ShadowTest {
         var best: ShadowCoach? = null; var bestDet = 0
         for (right in listOf(true, false)) {       // the app gets handedness from settings; here we try both
             val c = ShadowCoach(tpl, right, spec); var det = 0
+            // the motion-capture backhands have no camera: "forward = toward the camera" does not apply to them
+            if (file.startsWith("ttmd")) c.forwardToCamera = false
             for ((t, lm) in rows) for (e in c.feed(t, poseFromMpWorld(lm, right))) if (e is ShadowEvent.Detected) det++
             println("  ${spec.key} right=$right detected=$det matched=${matchedOf(c)} reject='${c.lastReject}'")
             if (best == null || matchedOf(c) > matchedOf(best)) { best = c; bestDet = det }

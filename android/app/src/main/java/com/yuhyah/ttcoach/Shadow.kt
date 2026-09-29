@@ -109,7 +109,9 @@ fun segmentLengths(poses: List<Pose>): Map<String, Double> {
 }
 
 /** kid-friendly wording; `bad` = +1 when a larger value is the problem; `at` = which moment shows it best */
-class IssueDef(val key: String, val bad: Int, val cue: String, val focusOk: String, val joint: Int, val at: String, val turn: Boolean = false)
+class IssueDef(val key: String, val bad: Int, val cue: String, val focusOk: String, val joint: Int, val at: String, val turn: Boolean = false,
+               /** measured along the camera's depth axis (front camera: least reliable) → judged with double tolerance */
+               val depth: Boolean = false)
 
 /** forehand / backhand differences: template, which way the swing goes sideways, what we judge */
 class StrokeSpec(val key: String, val name: String, val asset: String, val lateralSign: Int, val issues: List<IssueDef>) {
@@ -123,8 +125,8 @@ class StrokeSpec(val key: String, val name: String, val asset: String, val later
             IssueDef("pel_turn", -1, "屁股也要跟著轉", "屁股有轉，好棒！", J.HIP_P, "fin", turn = true)))
         val BACKHAND = StrokeSpec("bh", "反手", "bh_template.txt", +1, listOf(
             IssueDef("knee_bs", -1, "膝蓋彎，像坐高腳椅", "膝蓋有彎，好棒！", J.PELVIS, "bs"),
-            IssueDef("contact_fwd", -1, "在身體前面打球", "有在前面打，好棒！", J.WR_P, "imp"),
-            IssueDef("elbow_fwd", -1, "手肘放在肚子前面", "手肘位置很好！", J.EL_P, "imp"),
+            IssueDef("contact_fwd", -1, "在身體前面打球", "有在前面打，好棒！", J.WR_P, "imp", depth = true),
+            IssueDef("elbow_fwd", -1, "手肘放在肚子前面", "手肘位置很好！", J.EL_P, "imp", depth = true),
             IssueDef("wrist_rise", -1, "球拍往前上方送出去", "有往前送，好棒！", J.WR_P, "fin")))
         fun of(key: String?) = if (key == "bh") BACKHAND else FOREHAND
     }
@@ -315,6 +317,40 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
      * match is used, so all values are measured on the player's own timing.
      */
     var refine = true
+    /** the player faces the phone (shadow mode); tests on datasets filmed from other angles switch this off */
+    var forwardToCamera = System.getenv("FWDCAM") != "0"
+    /** forehand contact = racket at the side of the body (coach's definition; athletes' labelled hits sit there too) */
+    var sideContact = System.getenv("SIDE") != "0"
+    var contactSource = ""; private set
+
+    /**
+     * Forehand: the moment the wrist, swinging across, passes the athletes' contact spot beside the body
+     * (wrist this far to the playing side of the pelvis, sideways — a direction the camera sees well).
+     * Falls back to the raw speed peak when the swing never reaches out that far.
+     */
+    private fun contactAt(tc: Double): Double {
+        val raw = refineImpact(tc)
+        if (!sideContact || spec.key != "fh") { contactSource = "speed"; return raw }
+        val i0 = buf.indexOfFirst { it.t >= tc }.takeIf { it >= 0 } ?: return raw
+        val fr = BodyFrame.of(buf[i0].p, rightHanded)
+        fun side(p: Pose): Double {
+            val arm = (p[J.SH_P] - p[J.EL_P]).len() + (p[J.EL_P] - p[J.WR_P]).len()
+            return (p[J.WR_P] - p[J.PELVIS]).dot(fr.x) / max(0.2, arm)
+        }
+        var prev: F? = null
+        for (f in buf) {
+            if (f.t < tc - 0.35 || f.t > tc + 0.1) { if (f.t > tc + 0.1) break; prev = f; continue }
+            val pr = prev; prev = f
+            if (pr == null || pr.t < tc - 0.35) continue
+            val a = side(pr.p); val b = side(f.p)
+            if (a >= SIDE_AT && b < SIDE_AT) {                       // crossing toward the other side
+                val w = (a - SIDE_AT) / max(1e-6, a - b)
+                contactSource = "side"; return pr.t + w * (f.t - pr.t)
+            }
+        }
+        contactSource = "speed"; return raw
+    }
+
     /** the smoothed speed peak can sit a frame or two late: take the raw (3-frame) wrist speed peak nearby */
     private fun refineImpact(tc: Double): Double {
         var best = tc; var bs = -1.0
@@ -335,7 +371,7 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
             if (best == null || r.shape > best.shape + 0.02) best = r       // prefer real-time speed on near ties
         }
         if (best == null || !refine) return best
-        val tr = refineImpact(tc)
+        val tr = contactAt(tc)
         if (abs(tr - tc) < 1e-6 || buf.first().t > tr + tpl.t0 * best.scale + 0.1) return best
         val r = evaluateAt(tr, best.scale)
         return SwingResult(r.tImpact, r.stars, r.values, r.z, r.worst, r.local, r.frame, r.ib, r.i1, r.focusOk, best.shape, r.scale)
@@ -349,9 +385,14 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
             Array(14) { j -> val o = doubleArrayOf(0.0, 0.0, 0.0); for (q in lo..hi) { o[0] += raw[q][j][0]; o[1] += raw[q][j][1]; o[2] += raw[q][j][2] }; o[0] /= m; o[1] /= m; o[2] /= m; o }
         }
         var fr = BodyFrame.of(world[tpl.impact], rightHanded)
-        // forward = the way the wrist travels through impact (robust to left/right conventions)
-        val a = world[tpl.index(-0.25)][J.WR_P]; val b = world[tpl.index(0.1)][J.WR_P]
-        if ((b - a).dot(fr.y) < 0) fr = fr.flipped()
+        // forward: in shadow mode the phone stands where the table / opponent would be, so forward = toward the camera
+        // (world y = MediaPipe depth, negative toward the camera). The old rule "the way the wrist travels" failed for
+        // backhands, whose swing is mostly sideways: it flipped forward and backward. Kept only when facing is unclear.
+        if (forwardToCamera && abs(fr.y[1]) > 0.3) { if (fr.y[1] > 0) fr = fr.flipped() }
+        else {
+            val a = world[tpl.index(-0.25)][J.WR_P]; val b = world[tpl.index(0.1)][J.WR_P]
+            if ((b - a).dot(fr.y) < 0) fr = fr.flipped()
+        }
         val local = Array(tpl.n) { i -> Array(14) { j -> fr.toLocal(world[i][j]) } }
         val (v0, ib, i1) = swingValues(local, tpl.t0, tpl.dt, spec.key)
         val vals = if (!rectify) v0 else {
@@ -362,7 +403,7 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
             v0 + mapOf("sh_turn" to v1["sh_turn"]!!, "pel_turn" to v1["pel_turn"]!!)
         }
         val z = HashMap<String, Double>()
-        for (d in spec.issues) { val (med, iqr) = tpl.stats[d.key] ?: continue; z[d.key] = d.bad * ((vals[d.key] ?: med) - med) / (iqr / 1.35 + 1e-9) }
+        for (d in spec.issues) { val (med, iqr) = tpl.stats[d.key] ?: continue; z[d.key] = d.bad * ((vals[d.key] ?: med) - med) / (iqr / 1.35 + 1e-9) / (if (d.depth) 2.0 else 1.0) }
         val worst = spec.issues.maxByOrNull { z[it.key] ?: -9.0 }!!
         val zmax = z.values.maxOrNull() ?: 0.0
         // lenient on purpose: ~90% of the athletes' own strokes score 3 stars at 30 fps
@@ -402,7 +443,10 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
         return best
     }
 
-    companion object { const val SHAPE_MIN = 0.65; const val MIN_GAP = 0.6; val SCALES = listOf(1.0, 0.8, 1.25, 1.6); const val EVAL_DELAY = 0.55 }
+    companion object {
+        /** athletes' forehand contact: wrist this many arm lengths to the playing side of the pelvis (figshare median 0.69) */
+        const val SIDE_AT = 0.69
+        const val SHAPE_MIN = 0.65; const val MIN_GAP = 0.6; val SCALES = listOf(1.0, 0.8, 1.25, 1.6); const val EVAL_DELAY = 0.55 }
 
     /** the issue to work on after a set: the one with the largest total badness */
     fun chooseFocus(last: Int = 5): IssueDef {

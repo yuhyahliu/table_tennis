@@ -99,8 +99,6 @@ class ShadowActivity : ComponentActivity() {
     @Volatile var readyFrac = 0f
     private lateinit var bsPose: BackswingPose
     private var lostSince = -1.0
-    private var lastHip: DoubleArray? = null; private var lastHipT = 0.0
-    private var movingUntil = 0.0
     private var log: SessionLog? = null
     private var lastLoggedReject = ""
     private var frames = 0; private var fpsT0 = 0.0; private var frameNo = 0L
@@ -291,12 +289,10 @@ class ShadowActivity : ComponentActivity() {
             val inBackswing = waiting && body && bsPose.distance(pose, kidArm) < bsPose.near && coach.speed < 0.8
             readySince = if (inBackswing) (if (readySince < 0) t else readySince) else -1.0
             readyFrac = if (readySince > 0) ((t - readySince) / READY_HOLD).toFloat().coerceIn(0f, 1f) else 0f
-            // walking around (hips moving across the picture) is not a swing
-            val hip = doubleArrayOf(((lm[23][0] + lm[24][0]) / 2).toDouble(), ((lm[23][1] + lm[24][1]) / 2).toDouble())
-            lastHip?.let { h -> val v = hypot(hip[0] - h[0], hip[1] - h[1]) / max(1e-3, t - lastHipT); if (v > 0.35) movingUntil = t + 0.8 }
-            lastHip = hip; lastHipT = t
-            val listening = phase == Phase.DEMO || inRound
-            coach.hold = !listening || t < movingUntil
+            // (0.5–0.11 also ignored swings while the hips moved fast across the picture, meant for walking — but a good
+            //  forehand with hip turn and weight shift moves the hips that fast too, and those swings were lost. The stroke-shape
+            //  check already rejects walking and other non-strokes, so that filter is gone.)
+            coach.hold = !(phase == Phase.DEMO || inRound)
 
             // the player's own bone lengths → the shadow is their size
             val lp = coach.recentPoses()
