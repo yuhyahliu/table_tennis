@@ -384,7 +384,7 @@ class ShadowActivity : ComponentActivity() {
             is ShadowEvent.Scored -> {
                 val r = e.r
                 if (phase != Phase.FOLLOW && phase != Phase.FOCUS) return
-                if (roundResults.size >= 5 || detectTimes.none { abs(it - r.tImpact) < 1e-6 }) return   // only swings counted in this round
+                if (roundResults.size >= 5 || detectTimes.none { abs(it - r.tImpact) < 0.25 }) return   // only swings counted in this round
                 roundResults.add(r)
                 val good = if (phase == Phase.FOCUS) r.focusOk == true else r.stars == 3
                 streak = if (good) streak + 1 else 0

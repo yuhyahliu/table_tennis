@@ -298,7 +298,7 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
             lastSwing = tp; count++; lastReject = ""
             peaks.addLast(sp); while (peaks.size > 8) peaks.removeFirst()
             results.add(r)
-            ev.add(ShadowEvent.Detected(tp, sp, count)); ev.add(ShadowEvent.Scored(r))
+            ev.add(ShadowEvent.Detected(r.tImpact, sp, count)); ev.add(ShadowEvent.Scored(r))   // same time: the refined contact moment
         }
         return ev
     }

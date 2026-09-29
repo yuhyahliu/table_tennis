@@ -136,6 +136,21 @@ class ShadowTest {
         }
     }
 
+    /** the app pairs each count with its score by time: both events must carry the same time (0.10 broke this) */
+    @Test fun countAndScoreAgree() {
+        val tpl = tpl(StrokeSpec.FOREHAND)
+        val (rows, _) = session("fig_p01_30fps.csv.gz")
+        val c = ShadowCoach(tpl, true, StrokeSpec.FOREHAND)
+        var det = 0; var paired = 0
+        for ((t, lm) in rows) {
+            val ev = c.feed(t, poseFromMpWorld(lm, true))
+            val d = ev.filterIsInstance<ShadowEvent.Detected>(); val s = ev.filterIsInstance<ShadowEvent.Scored>()
+            det += d.size; paired += d.count { x -> s.any { it.r.tImpact == x.t } }
+        }
+        println("counted $det, paired with a score $paired")
+        assertTrue(det >= 10 && paired == det)
+    }
+
     @Test fun phaseTrackerFollowsTheTemplate() {
         val tpl = tpl(StrokeSpec.FOREHAND)
         val g = tpl.build()

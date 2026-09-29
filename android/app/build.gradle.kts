@@ -15,7 +15,7 @@ android {
         minSdk = 29
         targetSdk = 35
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
-        versionName = "0.10.$versionCode"
+        versionName = "0.11.$versionCode"
         // Pixel 9a and every recent Android phone are arm64: ship only that ABI (the others tripled the download)
         ndk { abiFilters += "arm64-v8a" }
     }
