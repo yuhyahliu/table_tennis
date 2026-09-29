@@ -314,14 +314,31 @@ class ShadowCoach(val tpl: Template, var rightHanded: Boolean = true, val spec: 
      * Kids swing slower than athletes: the stroke is compared at a few speeds (template time × scale) and the best
      * match is used, so all values are measured on the player's own timing.
      */
-    private fun evaluate(tImpact: Double): SwingResult? {
-        var best: SwingResult? = null
-        for (sc in SCALES) {
-            if (buf.isEmpty() || buf.first().t > tImpact + tpl.t0 * sc + 0.1) continue
-            val r = evaluateAt(tImpact, sc)
-            if (best == null || r.shape > best.shape + 0.02) best = r       // prefer real-time speed on near ties
+    var refine = true
+    /** the smoothed speed peak can sit a frame or two late: take the raw (3-frame) wrist speed peak nearby */
+    private fun refineImpact(tc: Double): Double {
+        var best = tc; var bs = -1.0
+        for (i in 1 until buf.size - 1) {
+            val t = buf[i].t; if (t < tc - 0.15 || t > tc + 0.08) continue
+            val v = (buf[i + 1].p[J.WR_P] - buf[i - 1].p[J.WR_P]).len() / max(1e-3, buf[i + 1].t - buf[i - 1].t)
+            if (v > bs) { bs = v; best = t }
         }
         return best
+    }
+
+    private fun evaluate(tc: Double): SwingResult? {
+        // "is it a stroke?" is decided at the detected peak; the moment of contact and all values use the refined time
+        var best: SwingResult? = null
+        for (sc in SCALES) {
+            if (buf.isEmpty() || buf.first().t > tc + tpl.t0 * sc + 0.1) continue
+            val r = evaluateAt(tc, sc)
+            if (best == null || r.shape > best.shape + 0.02) best = r       // prefer real-time speed on near ties
+        }
+        if (best == null || !refine) return best
+        val tr = refineImpact(tc)
+        if (abs(tr - tc) < 1e-6 || buf.first().t > tr + tpl.t0 * best.scale + 0.1) return best
+        val r = evaluateAt(tr, best.scale)
+        return SwingResult(r.tImpact, r.stars, r.values, r.z, r.worst, r.local, r.frame, r.ib, r.i1, r.focusOk, best.shape, r.scale)
     }
 
     private fun evaluateAt(tImpact: Double, sc: Double): SwingResult {

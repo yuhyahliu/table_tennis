@@ -122,6 +122,20 @@ class ShadowTest {
         assertTrue(m >= 8)
     }
 
+    /** the moment of contact used for the replay freeze and all measurements: close to the dataset's labelled hits */
+    @Test fun impactTiming() {
+        val tpl = tpl(StrokeSpec.FOREHAND)
+        val (rows, hits) = session("fig_p01_30fps.csv.gz")
+        for (step in listOf(1, 2)) {
+            val c = ShadowCoach(tpl, true, StrokeSpec.FOREHAND)
+            rows.filterIndexed { i, _ -> i % step == 0 }.forEach { (t, lm) -> c.feed(t, poseFromMpWorld(lm, true)) }
+            val off = hits.mapNotNull { h -> c.results.minByOrNull { abs(it.tImpact - h) }?.let { it.tImpact - h }?.takeIf { abs(it) < 0.3 } }
+            val err = off.map { abs(it) }.average()
+            println("${30 / step} fps: contact error %.0f ms (mean |.|)".format(err * 1000))
+            assertTrue(off.size >= 9 && err < 0.025)
+        }
+    }
+
     @Test fun phaseTrackerFollowsTheTemplate() {
         val tpl = tpl(StrokeSpec.FOREHAND)
         val g = tpl.build()
